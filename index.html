@@ -79,6 +79,7 @@
     const RefreshCw = (p) => <IconWrapper {...p}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></IconWrapper>;
     const Copy = (p) => <IconWrapper {...p}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></IconWrapper>;
     const Trash2 = (p) => <IconWrapper {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></IconWrapper>;
+    const X = (p) => <IconWrapper {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></IconWrapper>;
 
     // --- EXTENDED DATA ---
     const CATEGORIES = [
@@ -402,48 +403,86 @@
         localStorage.setItem('ot_hub_mastered', JSON.stringify(masteredIds));
       }, [masteredIds]);
 
-      // Cross-platform Web Speech API Helper (iOS/Android/Desktop Mobile Friendly)
+      // Cross-platform Web Speech API Helper
       const speakText = (text, e) => {
         if (e && e.stopPropagation) e.stopPropagation();
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel(); // Stop current speech
+
+        if (!('speechSynthesis' in window)) {
+          alert('您的瀏覽器不支援 Web Speech 語音功能，請嘗試使用 Safari 或 Chrome 瀏覽器。');
+          return;
+        }
+
+        try {
+          window.speechSynthesis.cancel();
+
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.lang = 'en-US';
           utterance.rate = speechRate;
-          
-          // iOS Safari requires a direct user gesture trigger
+          utterance.pitch = 1.0;
+
+          const voices = window.speechSynthesis.getVoices();
+          if (voices && voices.length > 0) {
+            const enVoice = voices.find(v => v.lang.startsWith('en') || v.lang.includes('US') || v.lang.includes('GB'));
+            if (enVoice) {
+              utterance.voice = enVoice;
+            }
+          }
+
           window.speechSynthesis.speak(utterance);
-        } else {
-          alert('您的裝置或瀏覽器不支援 Web Speech 語音發音功能。');
+        } catch (err) {
+          console.error("Speech Synthesis Error:", err);
+          alert('發音播放失敗，若您使用 iPhone/iPad，請確認未開啟側邊靜音切換鍵，或請重新整理頁面再試。');
         }
       };
 
-      const toggleBookmark = (id) => {
+      useEffect(() => {
+        if ('speechSynthesis' in window) {
+          const loadVoices = () => {
+            window.speechSynthesis.getVoices();
+          };
+          loadVoices();
+          if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+          }
+        }
+      }, []);
+
+      const toggleBookmark = (id, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         setBookmarkedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
       };
 
-      const toggleMastered = (id) => {
+      const toggleMastered = (id, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         setMasteredIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+      };
+
+      const deleteCustomPhrase = (id, e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (window.confirm("確定要刪除這條自訂短句嗎？")) {
+          setPhrases(prev => prev.filter(p => p.id !== id));
+          setBookmarkedIds(prev => prev.filter(i => i !== id));
+          setMasteredIds(prev => prev.filter(i => i !== id));
+        }
       };
 
       const handleAddPhrase = (e) => {
         e.preventDefault();
-        if (!newPhrase.english || !newPhrase.chinese) return;
-        const createdObj = {
+        if (!newPhrase.english.trim() || !newPhrase.chinese.trim()) {
+          alert("請填寫英文句與中文翻譯！");
+          return;
+        }
+        const created = {
           id: 'custom_' + Date.now(),
           category: newPhrase.category,
-          english: newPhrase.english,
-          chinese: newPhrase.chinese,
-          keywords: newPhrase.keywords.split(',').map(k => k.trim()).filter(Boolean),
-          context: newPhrase.context || '使用者自訂筆記紀錄'
+          english: newPhrase.english.trim(),
+          chinese: newPhrase.chinese.trim(),
+          keywords: newPhrase.keywords ? newPhrase.keywords.split(',').map(k => k.trim()) : [],
+          context: newPhrase.context.trim() || '使用者自訂筆記'
         };
-        setPhrases([createdObj, ...phrases]);
-        setIsAddModalOpen(false);
+        setPhrases(prev => [created, ...prev]);
         setNewPhrase({ category: 'adult', english: '', chinese: '', keywords: '', context: '' });
-      };
-
-      const handleDeleteCustomPhrase = (id) => {
-        setPhrases(phrases.filter(p => p.id !== id));
+        setIsAddModalOpen(false);
       };
 
       const filteredPhrases = useMemo(() => {
@@ -451,12 +490,12 @@
           const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
           const matchSearch = p.english.toLowerCase().includes(searchTerm.toLowerCase()) || 
                               p.chinese.includes(searchTerm) ||
-                              (p.keywords && p.keywords.some(k => k.toLowerCase().includes(searchTerm.toLowerCase())));
+                              p.keywords.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()));
           return matchCat && matchSearch;
         });
       }, [phrases, selectedCategory, searchTerm]);
 
-      const bookmarkedPhrasesList = useMemo(() => {
+      const bookmarkedPhrases = useMemo(() => {
         return phrases.filter(p => bookmarkedIds.includes(p.id));
       }, [phrases, bookmarkedIds]);
 
@@ -469,46 +508,46 @@
       }, [soapSelections]);
 
       const copyToClipboard = (text) => {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text);
-        } else {
-          const textarea = document.createElement('textarea');
-          textarea.value = text;
-          document.body.appendChild(textarea);
-          textarea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textarea);
-        }
+        navigator.clipboard.writeText(text);
         setCopiedSoap(true);
         setTimeout(() => setCopiedSoap(false), 2000);
       };
 
-      // Active flashcards set
-      const flashcardList = filteredPhrases.length > 0 ? filteredPhrases : phrases;
-      const currentCard = flashcardList[cardIndex % flashcardList.length];
+      // Flashcards navigation
+      const currentFlashcard = filteredPhrases[cardIndex] || filteredPhrases[0];
+
+      const handleNextCard = () => {
+        setIsFlipped(false);
+        setCardIndex(prev => (prev + 1) % (filteredPhrases.length || 1));
+      };
+
+      const handlePrevCard = () => {
+        setIsFlipped(false);
+        setCardIndex(prev => (prev - 1 + (filteredPhrases.length || 1)) % (filteredPhrases.length || 1));
+      };
 
       return (
-        <div className="min-h-screen flex flex-col">
-          {/* Top Header */}
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          {/* Header */}
           <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-teal-500/30">
             <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3">
               <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('phrases')}>
-                <div className="bg-gradient-to-tr from-teal-400 to-emerald-400 p-2.5 rounded-xl text-slate-950 font-bold flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <div className="bg-gradient-to-tr from-teal-500 to-emerald-400 p-2.5 rounded-xl text-slate-950 font-bold flex items-center justify-center shadow-inner">
                   <HeartPulse className="w-6 h-6 text-slate-950" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-lg font-bold text-white tracking-wide">OT Medical English Hub</h1>
-                    <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2 py-0.5 rounded-full font-medium">
+                    <h1 className="text-lg font-extrabold tracking-tight text-white">OT Medical English Hub</h1>
+                    <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2 py-0.5 rounded-full font-semibold">
                       職能治療英文
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400">Clinical Terminology & SOAP Sandbox</p>
+                  <p className="text-xs text-slate-400">Clinical Terminology & Practice Sandbox</p>
                 </div>
               </div>
 
               {/* Navigation Tabs */}
-              <nav className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700/60 overflow-x-auto max-w-full">
+              <nav className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 overflow-x-auto max-w-full scrollbar-none">
                 {[
                   { id: 'phrases', name: '臨床短句庫', Icon: Activity },
                   { id: 'reading', name: '案例閱讀', Icon: BookOpen },
@@ -522,15 +561,15 @@
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => { setActiveTab(tab.id); setIsFlipped(false); }}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
                         isActive ? 'bg-teal-500 text-slate-950 shadow-md font-bold' : 'text-slate-300 hover:bg-slate-700/60'
                       }`}
                     >
                       <TabIcon className="w-3.5 h-3.5" />
                       <span>{tab.name}</span>
                       {tab.badge > 0 && (
-                        <span className="ml-1 bg-amber-400 text-slate-950 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full shadow-sm">
+                        <span className="ml-1 bg-amber-400 text-slate-950 text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">
                           {tab.badge}
                         </span>
                       )}
@@ -541,44 +580,39 @@
             </div>
           </header>
 
-          {/* Speech & Progress Utility Bar */}
-          <div className="bg-slate-100 border-b border-slate-200 py-2 px-4 text-xs text-slate-600">
-            <div className="max-w-7xl mx-auto w-full flex flex-wrap items-center justify-between gap-2">
+          {/* TTS & Status Control Bar */}
+          <div className="bg-slate-100 border-b border-slate-200 py-2 px-4 text-xs text-slate-600 shadow-inner">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <Volume2 className="w-4 h-4 text-teal-600" />
-                <span className="font-semibold text-slate-700">全站發音語速 (TTS Rate):</span>
-                {[0.75, 0.9, 1.0, 1.15].map(rate => (
+                <span className="font-semibold text-slate-700">朗讀語速 (TTS Rate):</span>
+                {[0.8, 0.9, 1.0, 1.2].map(rate => (
                   <button
                     key={rate}
                     onClick={() => setSpeechRate(rate)}
                     className={`px-2 py-0.5 rounded font-mono text-[11px] transition ${
-                      speechRate === rate ? 'bg-teal-600 text-white font-bold shadow-sm' : 'bg-white border border-slate-300 hover:bg-slate-50'
+                      speechRate === rate ? 'bg-teal-600 text-white font-bold shadow-sm' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {rate}x
                   </button>
                 ))}
               </div>
+
               <div className="flex items-center space-x-4 text-[11px] text-slate-500">
-                <span>掌握度: <strong className="text-emerald-600 text-sm">{masteredIds.length}</strong> / {phrases.length}</span>
-                <button 
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="flex items-center space-x-1 bg-teal-50 border border-teal-200 text-teal-700 px-2.5 py-1 rounded-lg hover:bg-teal-100 font-semibold transition"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>新增自訂短句</span>
-                </button>
+                <span>精通進度: <strong className="text-emerald-600 font-mono text-xs">{masteredIds.length}</strong> / {phrases.length}</span>
+                <span>已收藏: <strong className="text-amber-600 font-mono text-xs">{bookmarkedIds.length}</strong></span>
               </div>
             </div>
           </div>
 
-          {/* Main Content Area */}
+          {/* MAIN CONTENT AREA */}
           <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
             
             {/* MODULE 1: CLINICAL PHRASES */}
             {activeTab === 'phrases' && (
               <div className="space-y-6">
-                {/* Search & Category Selector */}
+                {/* Search & Category Filter Bar */}
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
                     {CATEGORIES.map(cat => {
@@ -588,8 +622,8 @@
                         <button
                           key={cat.id}
                           onClick={() => setSelectedCategory(cat.id)}
-                          className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm whitespace-nowrap transition ${
-                            isSelected ? 'bg-teal-700 text-white font-medium shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm whitespace-nowrap transition ${
+                            isSelected ? 'bg-teal-600 text-white font-medium shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
                           <CatIcon className="w-3.5 h-3.5" />
@@ -599,102 +633,123 @@
                     })}
                   </div>
 
-                  <div className="relative w-full md:w-72">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="搜尋英文短句、中文或關鍵字..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 transition"
-                    />
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="relative w-full md:w-64">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="搜尋英文短句、中文或關鍵字..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1 whitespace-nowrap shadow-sm transition"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>新增短句</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Phrase Grid */}
+                {/* Phrase Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredPhrases.map((item) => {
-                    const isBookmarked = bookmarkedIds.includes(item.id);
-                    const isMastered = masteredIds.includes(item.id);
-                    const isCustom = item.id.startsWith('custom_');
+                  {filteredPhrases.length === 0 ? (
+                    <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
+                      <p className="text-slate-400 text-sm">找不到符合條件的臨床短句，請重新嘗試搜尋。</p>
+                    </div>
+                  ) : (
+                    filteredPhrases.map((item) => {
+                      const isBookmarked = bookmarkedIds.includes(item.id);
+                      const isMastered = masteredIds.includes(item.id);
+                      const isCustom = item.id.startsWith('custom_');
 
-                    return (
-                      <div key={item.id} className={`bg-white p-5 rounded-2xl shadow-sm border transition flex flex-col justify-between hover:shadow-md ${isMastered ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200'}`}>
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                      return (
+                        <div 
+                          key={item.id} 
+                          className={`bg-white p-5 rounded-2xl shadow-sm border transition flex flex-col justify-between relative group hover:shadow-md ${
+                            isMastered ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-md border border-teal-200/80">
                                 {CATEGORIES.find(c => c.id === item.category)?.name || 'OT 臨床'}
                               </span>
-                              {isCustom && (
-                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                  自訂
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <button 
-                                title={isMastered ? "標記為未掌握" : "標記為已掌握"}
-                                onClick={() => toggleMastered(item.id)} 
-                                className={`p-1.5 rounded-lg transition ${isMastered ? 'text-emerald-600 bg-emerald-100' : 'text-slate-300 hover:bg-slate-100'}`}
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </button>
-                              <button 
-                                title={isBookmarked ? "移除收藏" : "加入收藏"}
-                                onClick={() => toggleBookmark(item.id)} 
-                                className={`p-1.5 rounded-lg transition ${isBookmarked ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:bg-slate-100'}`}
-                              >
-                                <Bookmark className="w-4 h-4" fill={isBookmarked} />
-                              </button>
-                              <button 
-                                title="朗讀英文短句"
-                                onClick={(e) => speakText(item.english, e)} 
-                                className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition"
-                              >
-                                <Volume2 className="w-4 h-4" />
-                              </button>
-                              {isCustom && (
-                                <button
-                                  title="刪除自訂句子"
-                                  onClick={() => handleDeleteCustomPhrase(item.id)}
-                                  className="p-1.5 text-rose-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition"
+
+                              <div className="flex items-center space-x-1">
+                                <button 
+                                  onClick={(e) => speakText(item.english, e)} 
+                                  title="發音"
+                                  className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Volume2 className="w-4 h-4" />
                                 </button>
-                              )}
+                                <button 
+                                  onClick={(e) => toggleMastered(item.id, e)} 
+                                  title={isMastered ? "標記為未熟練" : "標記為已精通"}
+                                  className={`p-1.5 rounded-lg transition ${isMastered ? 'text-emerald-600 bg-emerald-100' : 'text-slate-300 hover:bg-slate-100'}`}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={(e) => toggleBookmark(item.id, e)} 
+                                  title="加入/移除收藏"
+                                  className={`p-1.5 rounded-lg transition ${isBookmarked ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:bg-slate-100'}`}
+                                >
+                                  <Bookmark className="w-4 h-4" fill={isBookmarked} />
+                                </button>
+                                {isCustom && (
+                                  <button 
+                                    onClick={(e) => deleteCustomPhrase(item.id, e)} 
+                                    title="刪除自訂筆記"
+                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
+
+                            {/* English Sentence */}
+                            <p 
+                              className="text-slate-900 font-semibold text-base leading-relaxed mb-2 font-serif cursor-pointer hover:text-teal-700 transition"
+                              onClick={(e) => speakText(item.english, e)}
+                            >
+                              {item.english}
+                            </p>
+
+                            {/* Keywords */}
+                            {item.keywords && item.keywords.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-3">
+                                {item.keywords.map((kw, kIdx) => (
+                                  <span 
+                                    key={kIdx} 
+                                    onClick={(e) => speakText(kw, e)}
+                                    className="text-[10px] font-mono bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-600 px-2 py-0.5 rounded cursor-pointer transition border border-slate-200/60"
+                                  >
+                                    #{kw}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Chinese Translation */}
+                            <p className="text-slate-600 text-sm mb-4 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100/80">
+                              {item.chinese}
+                            </p>
                           </div>
 
-                          <p className="text-slate-900 font-semibold text-base leading-relaxed mb-2 font-serif flex items-start justify-between gap-2">
-                            <span>{item.english}</span>
-                          </p>
-                          <p className="text-slate-600 text-sm mb-3 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">{item.chinese}</p>
-                          
-                          {item.keywords && item.keywords.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-3">
-                              {item.keywords.map((kw, kIdx) => (
-                                <button
-                                  key={kIdx}
-                                  onClick={(e) => speakText(kw, e)}
-                                  className="text-[10px] font-mono bg-slate-100 hover:bg-teal-50 hover:text-teal-800 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition flex items-center space-x-1"
-                                  title={`朗讀關鍵字: ${kw}`}
-                                >
-                                  <span>#{kw}</span>
-                                  <Volume2 className="w-2.5 h-2.5 text-slate-400 hover:text-teal-600" />
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          <div className="mt-2 pt-3 border-t border-slate-100 flex items-start space-x-2 text-xs text-slate-500">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                            <span><strong>臨床提示：</strong>{item.context}</span>
+                          </div>
                         </div>
-
-                        <div className="mt-2 pt-3 border-t border-slate-100 flex items-start space-x-2 text-xs text-slate-500">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                          <span><strong>臨床應用提示：</strong>{item.context}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             )}
@@ -702,42 +757,50 @@
             {/* MODULE 2: CASE READINGS */}
             {activeTab === 'reading' && (
               <div className="space-y-6">
-                {/* Article Switcher */}
-                <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+                {/* Article Switch Tabs */}
+                <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto scrollbar-none">
                   {ARTICLES.map((art, idx) => (
                     <button
                       key={art.id}
                       onClick={() => setSelectedArticleIdx(idx)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                        selectedArticleIdx === idx ? 'bg-slate-900 text-white shadow-sm' : 'bg-white border text-slate-600 hover:bg-slate-100'
+                      className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+                        selectedArticleIdx === idx ? 'bg-slate-900 text-white shadow-md' : 'bg-white border text-slate-600 hover:bg-slate-100'
                       }`}
                     >
-                      案例 {idx + 1}: {art.title.slice(0, 24)}...
+                      {art.title}
                     </button>
                   ))}
                 </div>
 
+                {/* Article Body */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-4 gap-2">
-                    <div className="flex items-center space-x-2">
-                      <div>
-                        <h2 className="text-xl font-bold text-slate-900">{ARTICLES[selectedArticleIdx].title}</h2>
-                        <p className="text-xs text-slate-500 mt-1">{ARTICLES[selectedArticleIdx].subtitle}</p>
-                      </div>
-                      <button 
-                        onClick={(e) => speakText(ARTICLES[selectedArticleIdx].title, e)} 
-                        className="text-teal-600 hover:bg-teal-50 p-2 rounded-lg transition"
-                        title="朗讀文章標題"
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-4 gap-3">
+                    <div>
+                      <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 uppercase tracking-wider">
+                        {ARTICLES[selectedArticleIdx].category} • {ARTICLES[selectedArticleIdx].readTime} read
+                      </span>
+                      <h2 
+                        className="text-xl font-bold text-slate-900 mt-1 cursor-pointer hover:text-teal-700"
+                        onClick={(e) => speakText(ARTICLES[selectedArticleIdx].title, e)}
                       >
-                        <Volume2 className="w-5 h-5" />
-                      </button>
+                        {ARTICLES[selectedArticleIdx].title}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-500">{ARTICLES[selectedArticleIdx].subtitle}</p>
                     </div>
+
                     <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={(e) => speakText(ARTICLES[selectedArticleIdx].title, e)}
+                        className="p-2 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-xl text-xs font-bold flex items-center space-x-1"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                        <span>朗讀標題</span>
+                      </button>
                       <button 
                         onClick={() => setShowChineseArticle(!showChineseArticle)} 
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border transition"
+                        className="px-3 py-2 bg-slate-100 text-xs font-semibold rounded-xl border border-slate-200 hover:bg-slate-200 transition"
                       >
-                        {showChineseArticle ? "隱藏中譯" : "顯示雙語對照"}
+                        {showChineseArticle ? "隱藏中譯" : "顯示雙語"}
                       </button>
                     </div>
                   </div>
@@ -745,112 +808,130 @@
                   {/* Paragraphs */}
                   <div className="space-y-4">
                     {ARTICLES[selectedArticleIdx].paragraphs.map((p) => (
-                      <div key={p.id} className="p-4 bg-slate-50/80 rounded-xl border border-slate-100 space-y-3">
+                      <div key={p.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
                         <div className="flex justify-between items-start gap-2">
                           <p className="text-slate-900 font-serif text-base leading-relaxed">{p.en}</p>
                           <button 
                             onClick={(e) => speakText(p.en, e)} 
-                            className="text-teal-600 hover:bg-teal-100 p-1.5 rounded-lg transition flex-shrink-0"
-                            title="朗讀全段文字"
+                            className="text-slate-400 hover:text-teal-600 p-1.5 bg-white rounded-lg border border-slate-200 shadow-sm flex-shrink-0"
+                            title="朗讀整段"
                           >
                             <Volume2 className="w-4 h-4" />
                           </button>
                         </div>
-                        {p.vocab && (
-                          <div className="flex flex-wrap gap-2 pt-1">
+
+                        {/* Vocabulary Pills */}
+                        {p.vocab && p.vocab.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-200/50">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider self-center">重點字彙:</span>
                             {p.vocab.map((v, vIdx) => (
-                              <div key={vIdx} className="inline-flex items-center bg-teal-50 border border-teal-200 text-teal-800 rounded-lg overflow-hidden">
+                              <div key={vIdx} className="inline-flex items-center bg-teal-50 border border-teal-200/80 rounded-lg overflow-hidden">
                                 <button 
                                   onClick={() => setActiveVocabModal(v)} 
-                                  className="text-xs px-2.5 py-1 font-medium hover:bg-teal-100 transition flex items-center space-x-1"
+                                  className="text-xs text-teal-900 px-2 py-1 font-semibold hover:bg-teal-100 transition"
                                 >
-                                  <span>{v.word}</span>
-                                  <span className="text-[10px] text-teal-500 font-mono">{v.phonetic}</span>
+                                  {v.word}
                                 </button>
                                 <button 
-                                  onClick={(e) => speakText(v.word, e)}
-                                  className="p-1 hover:bg-teal-200 border-l border-teal-200 text-teal-700 transition"
-                                  title={`朗讀單字: ${v.word}`}
+                                  onClick={(e) => speakText(v.word, e)} 
+                                  className="p-1 border-l border-teal-200/80 text-teal-700 hover:bg-teal-100"
+                                  title="發音"
                                 >
-                                  <Volume2 className="w-3.5 h-3.5" />
+                                  <Volume2 className="w-3 h-3" />
                                 </button>
                               </div>
                             ))}
                           </div>
                         )}
-                        {showChineseArticle && <p className="text-slate-600 text-sm pt-2 border-t border-slate-200/60 leading-relaxed">{p.zh}</p>}
+
+                        {showChineseArticle && (
+                          <p className="text-slate-600 text-sm pt-2 border-t border-slate-200/80 leading-relaxed">
+                            {p.zh}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
 
-                  {/* Quiz Section */}
-                  <div className="mt-8 pt-6 border-t border-slate-200">
-                    <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center space-x-2">
-                      <GraduationCap className="w-5 h-5 text-teal-600" />
-                      <span>閱讀理解與臨床思維隨測</span>
-                    </h3>
+                  {/* Article Quiz */}
+                  {ARTICLES[selectedArticleIdx].quiz && (
+                    <div className="mt-8 pt-6 border-t border-slate-200 space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <GraduationCap className="w-5 h-5 text-teal-600" />
+                        <h3 className="font-bold text-slate-900 text-base">閱讀理解微測驗</h3>
+                      </div>
 
-                    {ARTICLES[selectedArticleIdx].quiz.map((q) => {
-                      const selectedAns = quizAnswers[q.id];
-                      const isSubmitted = quizSubmitted[q.id];
+                      {ARTICLES[selectedArticleIdx].quiz.map((q) => {
+                        const isSubmitted = quizSubmitted[q.id];
+                        const selectedOpt = quizAnswers[q.id];
 
-                      return (
-                        <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-semibold text-slate-800 text-sm">{q.question}</p>
-                            <button 
+                        return (
+                          <div key={q.id} className="bg-slate-100/70 p-4 rounded-xl border border-slate-200 space-y-3">
+                            <p 
+                              className="font-semibold text-sm text-slate-800 cursor-pointer hover:text-teal-700"
                               onClick={(e) => speakText(q.question, e)}
-                              className="text-teal-600 hover:bg-teal-100 p-1 rounded transition flex-shrink-0"
-                              title="朗讀問題"
                             >
-                              <Volume2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            {q.options.map((opt, oIdx) => (
-                              <div key={oIdx} className={`flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition ${
-                                selectedAns === oIdx ? 'bg-teal-50 border-teal-500 font-medium' : 'bg-white border-slate-200 hover:bg-slate-100'
-                              }`}>
-                                <label className="flex items-center space-x-3 flex-1 cursor-pointer">
-                                  <input
-                                    type="radio"
-                                    name={`quiz_${q.id}`}
-                                    checked={selectedAns === oIdx}
-                                    onChange={() => setQuizAnswers({ ...quizAnswers, [q.id]: oIdx })}
-                                    disabled={isSubmitted}
-                                    className="text-teal-600 focus:ring-teal-500"
-                                  />
-                                  <span className="text-slate-700">{opt}</span>
-                                </label>
-                                <button
-                                  onClick={(e) => speakText(opt, e)}
-                                  className="text-slate-400 hover:text-teal-600 p-1 rounded transition ml-2"
-                                  title="朗讀選項"
-                                >
-                                  <Volume2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+                              {q.question}
+                            </p>
 
-                          {!isSubmitted ? (
-                            <button
-                              disabled={selectedAns === undefined}
-                              onClick={() => setQuizSubmitted({ ...quizSubmitted, [q.id]: true })}
-                              className="px-4 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg disabled:opacity-50 hover:bg-teal-700 transition"
-                            >
-                              提交答案
-                            </button>
-                          ) : (
-                            <div className={`p-3 rounded-lg text-xs ${selectedAns === q.correct ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'}`}>
-                              <p className="font-bold">{selectedAns === q.correct ? "✓ 回答正確！" : "✕ 回答不正確"}</p>
-                              <p className="mt-1">{q.rationale}</p>
+                            <div className="space-y-2">
+                              {q.options.map((opt, oIdx) => (
+                                <div key={oIdx} className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      if (!isSubmitted) {
+                                        setQuizAnswers(prev => ({ ...prev, [q.id]: oIdx }));
+                                      }
+                                    }}
+                                    className={`flex-1 text-left p-2.5 rounded-lg text-xs font-medium border transition ${
+                                      selectedOpt === oIdx 
+                                        ? 'bg-teal-600 text-white border-teal-600' 
+                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                  <button 
+                                    onClick={(e) => speakText(opt, e)} 
+                                    className="p-2 text-slate-400 hover:text-teal-600"
+                                  >
+                                    <Volume2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ))}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+
+                            <div className="flex items-center justify-between pt-2">
+                              <button
+                                onClick={() => {
+                                  if (selectedOpt !== undefined) {
+                                    setQuizSubmitted(prev => ({ ...prev, [q.id]: true }));
+                                  } else {
+                                    alert("請先選擇一個選項！");
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800"
+                              >
+                                送出答案
+                              </button>
+
+                              {isSubmitted && (
+                                <span className={`text-xs font-bold ${selectedOpt === q.correct ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {selectedOpt === q.correct ? "✓ 回答正確！" : "✕ 回答錯誤，再試一次！"}
+                                </span>
+                              )}
+                            </div>
+
+                            {isSubmitted && (
+                              <p className="text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200 italic">
+                                <strong>解析：</strong> {q.rationale}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -858,38 +939,50 @@
             {/* MODULE 3: SOAP BUILDER */}
             {activeTab === 'soap' && (
               <div className="max-w-4xl mx-auto space-y-6">
-                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md flex items-center space-x-3 border-l-4 border-teal-400">
-                  <FileText className="w-8 h-8 text-teal-300 flex-shrink-0" />
-                  <div>
-                    <h2 className="text-lg font-bold">SOAP 病歷實戰組裝沙盒</h2>
-                    <p className="text-xs text-slate-300">靈活選擇臨床常見評估與計畫句型，即時生成可一鍵複製及真人朗讀的標準英文病歷。</p>
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-6 h-6 text-teal-300" />
+                    <div>
+                      <h2 className="text-lg font-bold">SOAP 病歷實戰組裝沙盒</h2>
+                      <p className="text-xs text-slate-300">選擇不同章節的標準描述，即時生成可複製與朗讀的英文病歷。</p>
+                    </div>
                   </div>
+                  <button 
+                    onClick={(e) => speakText(builtSoapText, e)} 
+                    className="px-3 py-2 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold text-xs rounded-xl flex items-center space-x-1"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">朗讀全文</span>
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Selector Left Side */}
+                  {/* Selector Column */}
                   <div className="space-y-4">
                     {Object.keys(SOAP_BUILDER_DATA).map((secKey) => {
                       const sec = SOAP_BUILDER_DATA[secKey];
                       return (
-                        <div key={secKey} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
-                          <h4 className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded inline-block border border-teal-200">{sec.title}</h4>
+                        <div key={secKey} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2 shadow-sm">
+                          <h4 className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded inline-block border border-teal-200/60">
+                            {sec.title}
+                          </h4>
                           {sec.options.map((opt, oIdx) => (
-                            <div
-                              key={oIdx}
-                              onClick={() => setSoapSelections(prev => ({ ...prev, [secKey]: oIdx }))}
-                              className={`w-full text-left p-3 rounded-lg text-xs border transition cursor-pointer flex items-start justify-between gap-2 ${
-                                soapSelections[secKey] === oIdx ? 'bg-teal-50 text-teal-900 border-teal-500 font-medium shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                              }`}
-                            >
-                              <div className="flex-1">
-                                <p className="font-mono leading-relaxed">{opt.text}</p>
-                                <p className="text-[11px] text-slate-500 mt-1">{opt.translation}</p>
-                              </div>
+                            <div key={oIdx} className="flex items-start space-x-1">
                               <button
-                                onClick={(e) => speakText(opt.text, e)}
-                                className="p-1.5 text-teal-600 hover:bg-teal-100 rounded-lg transition"
-                                title="朗讀句型"
+                                onClick={() => setSoapSelections(prev => ({ ...prev, [secKey]: oIdx }))}
+                                className={`flex-1 text-left p-3 rounded-lg text-xs border transition ${
+                                  soapSelections[secKey] === oIdx 
+                                    ? 'bg-teal-50 text-teal-900 border-teal-500 font-medium shadow-sm' 
+                                    : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100'
+                                }`}
+                              >
+                                <p className="font-mono">{opt.text}</p>
+                                <p className="text-[11px] text-slate-500 mt-1">{opt.translation}</p>
+                              </button>
+                              <button 
+                                onClick={(e) => speakText(opt.text, e)} 
+                                className="p-2 text-slate-400 hover:text-teal-600 mt-1"
+                                title="朗讀此句"
                               >
                                 <Volume2 className="w-3.5 h-3.5" />
                               </button>
@@ -900,34 +993,33 @@
                     })}
                   </div>
 
-                  {/* Output Preview Right Side */}
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-fit sticky top-20">
+                  {/* Result & Export Preview Column */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-fit sticky top-20 space-y-4">
                     <div>
                       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                        <h3 className="font-bold text-slate-900 text-sm">即時匯出英文病歷文字</h3>
-                        <div className="flex items-center space-x-2">
-                          <button 
-                            onClick={(e) => speakText(builtSoapText, e)} 
-                            className="p-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg border border-teal-200 transition"
-                            title="全文完整朗讀"
-                          >
-                            <Volume2 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => copyToClipboard(builtSoapText)} 
-                            className="flex items-center space-x-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg transition shadow-sm"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>{copiedSoap ? "已複製！" : "複製全文"}</span>
-                          </button>
-                        </div>
+                        <h3 className="font-bold text-slate-900 text-sm">預覽與匯出病歷文字</h3>
+                        <button 
+                          onClick={() => copyToClipboard(builtSoapText)} 
+                          className="flex items-center space-x-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg transition shadow-sm"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{copiedSoap ? "已複製！" : "複製全文"}</span>
+                        </button>
                       </div>
-                      <div className="mt-4 p-4 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl whitespace-pre-wrap leading-relaxed shadow-inner border border-slate-800">
+
+                      <div className="mt-4 p-4 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl whitespace-pre-wrap leading-relaxed shadow-inner">
                         {builtSoapText}
                       </div>
                     </div>
-                    <div className="mt-4 pt-3 border-t text-[11px] text-slate-400">
-                      提示：點選左側範本選項即可即時重組英文文件，可直接播放聲音確認語感。
+
+                    <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+                      <span>包含 4 個 SOAP 章節項目</span>
+                      <button 
+                        onClick={() => window.print()} 
+                        className="text-teal-700 font-semibold hover:underline"
+                      >
+                        列印 / 存為 PDF
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -937,42 +1029,45 @@
             {/* MODULE 4: GLOSSARY */}
             {activeTab === 'glossary' && (
               <div className="space-y-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <GraduationCap className="w-5 h-5 text-teal-600" />
-                    <span className="text-sm font-bold text-slate-800">職能治療專業縮寫與專有名詞辭典</span>
-                  </div>
-                  <span className="text-xs text-slate-500">共收錄 {GLOSSARY.length} 項精選辭條</span>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {GLOSSARY.map((item, idx) => (
                     <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-teal-300 transition">
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-2">
-                            <span className="text-lg font-extrabold text-teal-800 font-mono tracking-wide">{item.term}</span>
+                            <span className="text-lg font-extrabold text-teal-800 font-mono">{item.term}</span>
                             <button 
-                              onClick={(e) => speakText(`${item.term}. ${item.fullText}`, e)}
-                              className="p-1 text-teal-600 hover:bg-teal-50 rounded-lg transition"
-                              title={`朗讀: ${item.term} (${item.fullText})`}
+                              onClick={(e) => speakText(item.term, e)} 
+                              className="p-1 text-slate-400 hover:text-teal-600"
+                              title="朗讀縮寫"
                             >
-                              <Volume2 className="w-4 h-4" />
+                              <Volume2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200">{item.category}</span>
+                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200">
+                            {item.category}
+                          </span>
                         </div>
-                        <p className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
-                          <span>{item.fullText}</span>
-                          <button 
+
+                        <div className="flex items-center space-x-1.5 mb-2">
+                          <p 
+                            className="text-xs font-semibold text-slate-700 cursor-pointer hover:text-teal-700"
                             onClick={(e) => speakText(item.fullText, e)}
-                            className="p-0.5 text-slate-400 hover:text-teal-600 transition"
-                            title="朗讀英文全稱"
                           >
-                            <Volume2 className="w-3.5 h-3.5" />
+                            {item.fullText}
+                          </p>
+                          <button 
+                            onClick={(e) => speakText(item.fullText, e)} 
+                            className="p-0.5 text-slate-400 hover:text-teal-600"
+                            title="朗讀全稱"
+                          >
+                            <Volume2 className="w-3 h-3" />
                           </button>
+                        </div>
+
+                        <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100/80 leading-relaxed">
+                          {item.definition}
                         </p>
-                        <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">{item.definition}</p>
                       </div>
                     </div>
                   ))}
@@ -984,100 +1079,112 @@
             {activeTab === 'flashcards' && (
               <div className="max-w-xl mx-auto space-y-6">
                 <div className="text-center space-y-1">
-                  <h2 className="text-xl font-bold text-slate-900">單字與句型卡片翻牌複習</h2>
-                  <p className="text-xs text-slate-500">點擊卡片翻面，左右切換進行間隔記憶訓練</p>
+                  <h2 className="text-lg font-bold text-slate-900">3D 字卡翻牌複習</h2>
+                  <p className="text-xs text-slate-500">點擊卡片可翻轉查看中文翻譯與提示；可搭配語音發音與精通標記。</p>
                 </div>
 
-                {currentCard ? (
-                  <div className="space-y-6">
-                    {/* 3D Card Container */}
+                {filteredPhrases.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-300">
+                    <p className="text-slate-500 text-sm">目前的篩選條件下沒有字卡可供複習。</p>
+                  </div>
+                ) : (
+                  <div>
+                    {/* 3D Flip Card Container */}
                     <div 
                       onClick={() => setIsFlipped(!isFlipped)}
-                      className="w-full h-80 perspective-1000 cursor-pointer"
+                      className="perspective-1000 w-full min-h-[280px] cursor-pointer"
                     >
-                      <div className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
+                      <div className={`relative w-full h-full min-h-[280px] duration-500 transform-style-3d transition-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
                         
-                        {/* Front Side */}
-                        <div className="absolute w-full h-full backface-hidden bg-white border-2 border-teal-300 rounded-3xl p-8 shadow-xl flex flex-col justify-between items-center text-center">
-                          <div className="w-full flex justify-between items-center text-xs text-slate-400 border-b pb-2">
-                            <span>卡片 {cardIndex + 1} / {flashcardList.length}</span>
-                            <span className="bg-teal-50 text-teal-800 px-2 py-0.5 rounded font-semibold">{CATEGORIES.find(c => c.id === currentCard.category)?.name}</span>
-                          </div>
-                          
-                          <div className="my-auto space-y-3">
-                            <p className="text-xl font-bold font-serif text-slate-900 leading-relaxed">{currentCard.english}</p>
-                            <span className="inline-block text-[11px] text-teal-600 bg-teal-50 px-3 py-1 rounded-full font-semibold">點擊翻面檢視中文對照</span>
+                        {/* FRONT SIDE (English) */}
+                        <div className="absolute inset-0 w-full h-full bg-white rounded-3xl border-2 border-teal-200 shadow-xl p-8 flex flex-col justify-between backface-hidden">
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span className="font-mono">#{cardIndex + 1} / {filteredPhrases.length}</span>
+                            <span className="bg-teal-50 text-teal-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-200">
+                              {CATEGORIES.find(c => c.id === currentFlashcard.category)?.name}
+                            </span>
                           </div>
 
-                          <div className="w-full flex justify-end">
-                            <button 
-                              onClick={(e) => speakText(currentCard.english, e)} 
-                              className="p-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-full transition border border-teal-200"
-                              title="朗讀英文卡片"
-                            >
-                              <Volume2 className="w-5 h-5" />
-                            </button>
+                          <div className="my-auto space-y-4">
+                            <p className="text-slate-900 font-extrabold text-lg sm:text-xl font-serif leading-relaxed text-center">
+                              {currentFlashcard.english}
+                            </p>
+                            
+                            <div className="flex justify-center">
+                              <button 
+                                onClick={(e) => speakText(currentFlashcard.english, e)} 
+                                className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold flex items-center space-x-1 shadow-sm transition"
+                              >
+                                <Volume2 className="w-4 h-4" />
+                                <span>發音</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="text-center text-[11px] text-slate-400">
+                            輕點卡片以翻看中文翻譯 ↺
                           </div>
                         </div>
 
-                        {/* Back Side */}
-                        <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-slate-900 text-white rounded-3xl p-8 shadow-xl flex flex-col justify-between items-center text-center border-2 border-slate-700">
-                          <div className="w-full flex justify-between items-center text-xs text-slate-400 border-b border-slate-800 pb-2">
-                            <span>中文翻譯與臨床重點</span>
-                            <span className="text-amber-400 font-semibold">提示卡</span>
+                        {/* BACK SIDE (Chinese & Hint) */}
+                        <div className="absolute inset-0 w-full h-full bg-slate-900 text-white rounded-3xl border-2 border-slate-700 shadow-xl p-8 flex flex-col justify-between rotate-y-180 backface-hidden">
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span className="font-mono">答案頁</span>
+                            <span className="text-teal-400 font-bold text-[10px]">OT Medical English</span>
                           </div>
 
-                          <div className="my-auto space-y-3">
-                            <p className="text-lg font-medium text-emerald-300 leading-relaxed">{currentCard.chinese}</p>
-                            <p className="text-xs text-slate-400 bg-slate-800/80 p-3 rounded-xl border border-slate-700">{currentCard.context}</p>
+                          <div className="my-auto space-y-3 text-center">
+                            <p className="text-emerald-400 text-base sm:text-lg font-bold leading-relaxed">
+                              {currentFlashcard.chinese}
+                            </p>
+                            
+                            <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 text-xs text-slate-300 text-left space-y-1">
+                              <p className="text-amber-400 font-semibold text-[11px]">臨床情境：</p>
+                              <p>{currentFlashcard.context}</p>
+                            </div>
                           </div>
 
-                          <div className="w-full flex justify-between items-center">
-                            <span className="text-[11px] text-slate-500">再次點擊可翻回正面</span>
-                            <button 
-                              onClick={(e) => speakText(currentCard.english, e)} 
-                              className="p-2 bg-slate-800 hover:bg-slate-700 text-teal-300 rounded-full transition border border-slate-600"
-                              title="再次朗讀英文"
-                            >
-                              <Volume2 className="w-4 h-4" />
-                            </button>
+                          <div className="text-center text-[11px] text-slate-500">
+                            再次點擊可返回英文面 ↺
                           </div>
                         </div>
 
                       </div>
                     </div>
 
-                    {/* Card Controls */}
-                    <div className="flex items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    {/* Controls Bar Below Card */}
+                    <div className="flex items-center justify-between mt-6">
                       <button 
-                        onClick={() => { setIsFlipped(false); setCardIndex((prev) => (prev > 0 ? prev - 1 : flashcardList.length - 1)); }}
-                        className="flex items-center space-x-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                        onClick={handlePrevCard}
+                        className="p-3 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-2xl shadow-sm flex items-center space-x-1 text-xs font-bold transition"
                       >
                         <ChevronLeft className="w-4 h-4" />
                         <span>上一張</span>
                       </button>
 
-                      <button 
-                        onClick={() => { toggleMastered(currentCard.id); }}
-                        className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center space-x-1.5 ${
-                          masteredIds.includes(currentCard.id) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>{masteredIds.includes(currentCard.id) ? "已標記熟練" : "標記為已熟練"}</span>
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={(e) => toggleMastered(currentFlashcard.id, e)}
+                          className={`p-3 rounded-2xl border text-xs font-bold flex items-center space-x-1 transition ${
+                            masteredIds.includes(currentFlashcard.id) 
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{masteredIds.includes(currentFlashcard.id) ? "已熟練" : "標記熟練"}</span>
+                        </button>
+                      </div>
 
                       <button 
-                        onClick={() => { setIsFlipped(false); setCardIndex((prev) => (prev + 1) % flashcardList.length); }}
-                        className="flex items-center space-x-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                        onClick={handleNextCard}
+                        className="p-3 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl shadow-sm flex items-center space-x-1 text-xs font-bold transition"
                       >
                         <span>下一張</span>
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center p-8 bg-white rounded-2xl border">無字卡資料</div>
                 )}
               </div>
             )}
@@ -1085,49 +1192,37 @@
             {/* MODULE 6: BOOKMARKS */}
             {activeTab === 'bookmarks' && (
               <div className="space-y-6">
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between text-xs text-amber-900">
-                  <div className="flex items-center space-x-2">
-                    <Bookmark className="w-4 h-4 text-amber-600" fill />
-                    <span>您的個人收藏清單 (共 {bookmarkedPhrasesList.length} 條)</span>
-                  </div>
+                <div className="flex items-center justify-between border-b pb-3">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                    <Bookmark className="w-5 h-5 text-amber-500" fill />
+                    <span>我的收藏短句庫 ({bookmarkedPhrases.length})</span>
+                  </h2>
                 </div>
 
-                {bookmarkedPhrasesList.length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-2xl border border-dashed text-slate-400 text-sm">
-                    尚無收藏之短句。在「臨床短句庫」中點擊書籤按鈕即可將語句加入收藏夾！
+                {bookmarkedPhrases.length === 0 ? (
+                  <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+                    <p className="text-slate-400 text-sm">尚無收藏的短句，可在「臨床短句庫」中點擊書籤圖示加入。</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {bookmarkedPhrasesList.map((item) => (
+                    {bookmarkedPhrases.map((item) => (
                       <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
-                              {CATEGORIES.find(c => c.id === item.category)?.name || 'OT 臨床'}
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                              {CATEGORIES.find(c => c.id === item.category)?.name}
                             </span>
                             <div className="flex items-center space-x-1">
-                              <button onClick={() => toggleBookmark(item.id)} className="p-1.5 text-amber-500 bg-amber-50 rounded-lg">
-                                <Bookmark className="w-4 h-4" fill />
-                              </button>
                               <button onClick={(e) => speakText(item.english, e)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">
                                 <Volume2 className="w-4 h-4" />
                               </button>
+                              <button onClick={(e) => toggleBookmark(item.id, e)} className="p-1.5 text-amber-500 hover:bg-amber-50 rounded-lg">
+                                <Bookmark className="w-4 h-4" fill />
+                              </button>
                             </div>
                           </div>
-                          <p className="text-slate-900 font-semibold text-base leading-relaxed mb-2 font-serif flex items-start justify-between gap-2">
-                            <span>{item.english}</span>
-                            <button 
-                              onClick={(e) => speakText(item.english, e)}
-                              className="text-teal-600 hover:text-teal-800 p-1 rounded transition flex-shrink-0"
-                              title="朗讀短句"
-                            >
-                              <Volume2 className="w-4 h-4" />
-                            </button>
-                          </p>
-                          <p className="text-slate-600 text-sm mb-3 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">{item.chinese}</p>
-                        </div>
-                        <div className="mt-2 pt-3 border-t border-slate-100 text-xs text-slate-500">
-                          <strong>臨床提示：</strong>{item.context}
+                          <p className="text-slate-900 font-semibold text-base font-serif mb-2">{item.english}</p>
+                          <p className="text-slate-600 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">{item.chinese}</p>
                         </div>
                       </div>
                     ))}
@@ -1135,60 +1230,30 @@
                 )}
               </div>
             )}
+
           </main>
 
-          {/* Modal for Vocab Detail */}
-          {activeVocabModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
-                <div className="flex justify-between items-start border-b pb-3">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 font-mono">{activeVocabModal.word}</h3>
-                    <p className="text-xs text-teal-600 font-mono mt-0.5">{activeVocabModal.phonetic}</p>
-                  </div>
-                  <button 
-                    onClick={(e) => speakText(activeVocabModal.word, e)}
-                    className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg"
-                    title="朗讀單字"
-                  >
-                    <Volume2 className="w-5 h-5" />
-                  </button>
-                </div>
-                <p className="text-sm text-slate-700 leading-relaxed">{activeVocabModal.definition}</p>
-                <div className="pt-2 flex justify-end">
-                  <button 
-                    onClick={() => setActiveVocabModal(null)}
-                    className="px-4 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl"
-                  >
-                    關閉
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Modal for Adding Custom Phrase */}
+          {/* ADD CUSTOM PHRASE MODAL */}
           {isAddModalOpen && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <form onSubmit={handleAddPhrase} className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl border border-slate-100">
-                <div className="flex justify-between items-center border-b pb-3">
-                  <h3 className="text-base font-bold text-slate-900">新增自訂 OT 臨床短句</h3>
-                  <button 
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="text-slate-400 hover:text-slate-600 text-sm font-bold"
-                  >
-                    ✕
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 relative animate-in fade-in zoom-in duration-200">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <h3 className="font-bold text-slate-900 text-base flex items-center space-x-2">
+                    <PlusCircle className="w-5 h-5 text-emerald-600" />
+                    <span>新增自訂臨床短句</span>
+                  </h3>
+                  <button onClick={() => setIsAddModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                <div className="space-y-3 text-xs">
+                <form onSubmit={handleAddPhrase} className="space-y-3">
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">分類領域</label>
-                    <select 
+                    <label className="block text-xs font-bold text-slate-700 mb-1">專業領域分類</label>
+                    <select
                       value={newPhrase.category}
-                      onChange={(e) => setNewPhrase({...newPhrase, category: e.target.value})}
-                      className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      onChange={(e) => setNewPhrase({ ...newPhrase, category: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                     >
                       {CATEGORIES.filter(c => c.id !== 'all').map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
@@ -1197,75 +1262,118 @@
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">英文短句 (English)</label>
-                    <textarea 
+                    <label className="block text-xs font-bold text-slate-700 mb-1">英文短句 *</label>
+                    <textarea
                       required
-                      rows={2}
+                      rows="2"
+                      placeholder="e.g. Patient demonstrated improved dynamic sitting balance..."
                       value={newPhrase.english}
-                      onChange={(e) => setNewPhrase({...newPhrase, english: e.target.value})}
-                      placeholder="e.g., Client requires Min A for tub transfer..."
-                      className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      onChange={(e) => setNewPhrase({ ...newPhrase, english: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">中文翻譯 (Chinese)</label>
-                    <textarea 
+                    <label className="block text-xs font-bold text-slate-700 mb-1">中文翻譯 *</label>
+                    <textarea
                       required
-                      rows={2}
+                      rows="2"
+                      placeholder="e.g. 患者展現進步之動態坐姿平衡..."
                       value={newPhrase.chinese}
-                      onChange={(e) => setNewPhrase({...newPhrase, chinese: e.target.value})}
-                      placeholder="例：個案在浴缸轉位需要輕度協助..."
-                      className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      onChange={(e) => setNewPhrase({ ...newPhrase, chinese: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">關鍵字 (以逗號分隔)</label>
-                    <input 
+                    <label className="block text-xs font-bold text-slate-700 mb-1">關鍵字標籤 (以逗號分隔)</label>
+                    <input
                       type="text"
+                      placeholder="e.g. sitting balance, OT, stroke"
                       value={newPhrase.keywords}
-                      onChange={(e) => setNewPhrase({...newPhrase, keywords: e.target.value})}
-                      placeholder="e.g., Min A, tub transfer, ADL"
-                      className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      onChange={(e) => setNewPhrase({ ...newPhrase, keywords: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">臨床應用提示 / 脈絡</label>
-                    <input 
+                    <label className="block text-xs font-bold text-slate-700 mb-1">臨床情境與提示</label>
+                    <input
                       type="text"
+                      placeholder="e.g. 中風平衡訓練進步紀錄"
                       value={newPhrase.context}
-                      onChange={(e) => setNewPhrase({...newPhrase, context: e.target.value})}
-                      placeholder="例：常用於日常生活評估紀錄"
-                      className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      onChange={(e) => setNewPhrase({ ...newPhrase, context: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
-                </div>
 
-                <div className="pt-2 flex justify-end space-x-2">
-                  <button 
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
-                  >
-                    取消
-                  </button>
-                  <button 
-                    type="submit"
-                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-sm"
-                  >
-                    儲存短句
-                  </button>
-                </div>
-              </form>
+                  <div className="pt-2 flex justify-end space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm"
+                    >
+                      儲存短句
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
+
+          {/* VOCAB MODAL */}
+          {activeVocabModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 relative animate-in fade-in zoom-in duration-200">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-extrabold text-teal-800 text-lg font-mono">{activeVocabModal.word}</span>
+                    <button 
+                      onClick={(e) => speakText(activeVocabModal.word, e)}
+                      className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <button onClick={() => setActiveVocabModal(null)} className="p-1 text-slate-400 hover:text-slate-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-mono text-slate-400">{activeVocabModal.phonetic}</p>
+                  <p className="text-sm font-semibold text-slate-800 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    {activeVocabModal.definition}
+                  </p>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    onClick={() => setActiveVocabModal(null)}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold hover:bg-teal-700 shadow-sm"
+                  >
+                    關閉
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="bg-white border-t border-slate-200 py-4 px-4 text-center text-xs text-slate-500">
+            <p>© OT Medical English Hub — 職能治療專業英文學習沙盒</p>
+          </footer>
         </div>
       );
     }
 
-    // Render the React app
+    // Render App
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
