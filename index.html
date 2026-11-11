@@ -1,1277 +1,645 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  BookOpen, 
-  Volume2, 
-  Bookmark, 
-  Search, 
-  CheckCircle2, 
-  XCircle, 
-  Award, 
-  Activity, 
-  Brain, 
-  Baby, 
-  Sliders, 
-  GraduationCap, 
-  HeartPulse, 
-  Sparkles,
-  Check,
-  Zap,
-  FileText,
-  RotateCcw,
-  Sparkle,
-  BookMarked,
-  Layers,
-  HelpCircle,
-  Copy,
-  ExternalLink,
-  ChevronRight,
-  Filter,
-  Play,
-  Pause,
-  Clock
-} from 'lucide-react';
-
-// --- EXPANDED OT CATEGORIES & DATA ---
-
-const CATEGORIES = [
-  { id: 'all', name: '全部分類', icon: Activity },
-  { id: 'adult', name: '成人生理職能治療 (Physical Rehab)', icon: HeartPulse },
-  { id: 'peds', name: '兒童與早期療育 (Pediatric OT)', icon: Baby },
-  { id: 'psy', name: '心理職能治療 (Psychosocial OT)', icon: Brain },
-  { id: 'assistive', name: '輔具與人因工程 (Assistive Tech)', icon: Sliders },
-  { id: 'soap', name: '病歷寫作句型 (SOAP Documentation)', icon: FileText },
-];
-
-const PHRASES = [
-  // Adult Rehab
-  {
-    id: 'p1',
-    category: 'adult',
-    english: "The patient demonstrates decreased active range of motion (AROM) in the right shoulder due to spasticity and hypertonicity.",
-    chinese: "患者因痙攣與肌張力過高，導致右肩主動關節活動度 (AROM) 降低。",
-    keywords: ["AROM", "hypertonicity", "spasticity"],
-    context: "中風或腦傷上肢評估紀錄，描述關節活動受限主因。",
-    audioText: "The patient demonstrates decreased active range of motion in the right shoulder due to spasticity and hypertonicity."
-  },
-  {
-    id: 'p2',
-    category: 'adult',
-    english: "Client requires minimal assistance (Min A) of 1 for standing balance during upper extremity dressing.",
-    chinese: "個案在上肢穿衣過程中需要單人輕度協助 (Min A) 以維持站立平衡。",
-    keywords: ["Minimal assistance (Min A)", "standing balance", "UE dressing"],
-    context: "評估日常穿衣獨立度與站立平衡表現。",
-    audioText: "Client requires minimal assistance of 1 for standing balance during upper extremity dressing."
-  },
-  {
-    id: 'p3',
-    category: 'adult',
-    english: "Prior to discharge, the client achieved full independence in basic ADLs utilizing energy conservation techniques.",
-    chinese: "出院前，個案運用省力策略 (Energy Conservation) 達成了基本日常生活活動 (ADLs) 的完全獨立。",
-    keywords: ["discharge", "ADLs", "energy conservation"],
-    context: "心肺復健或慢性病出院準備評估報告寫作。",
-    audioText: "Prior to discharge, the client achieved full independence in basic ADLs utilizing energy conservation techniques."
-  },
-  {
-    id: 'p4',
-    category: 'adult',
-    english: "Instructed client in proper dynamic tub-bench transfer techniques to prevent weight-bearing violations on the affected hip.",
-    chinese: "指導個案正確的動態浴缸轉位椅轉位技巧，以避免患側髖關節過度承重違反醫囑限制。",
-    keywords: ["tub-bench transfer", "weight-bearing", "affected hip"],
-    context: "髖關節置換術 (THA) 後轉位指導術語。",
-    audioText: "Instructed client in proper dynamic tub bench transfer techniques to prevent weight bearing violations on the affected hip."
-  },
-
-  // Pediatrics & Early Intervention
-  {
-    id: 'p5',
-    category: 'peds',
-    english: "Child exhibits tactile defensiveness when exposed to textured art materials and requires heavy proprioceptive input to self-regulate.",
-    chinese: "兒童在接觸不同材質的美勞材料時展現觸覺防禦，且需要高強度的本體覺輸入來自我調節。",
-    keywords: ["tactile defensiveness", "proprioceptive input", "self-regulate"],
-    context: "感覺統合 (SI) 評估與介入紀錄專用表達。",
-    audioText: "Child exhibits tactile defensiveness when exposed to textured art materials and requires heavy proprioceptive input to self-regulate."
-  },
-  {
-    id: 'p6',
-    category: 'peds',
-    english: "The intervention plan focuses on improving fine motor precision and dynamic tripod grasp for functional handwriting.",
-    chinese: "介入計畫著重於提升精細動作精準度與動態三指握姿，以增進功能性握筆書寫能力。",
-    keywords: ["fine motor precision", "dynamic tripod grasp", "handwriting"],
-    context: "學齡前兒童握筆發展遲緩評估與目標設定。",
-    audioText: "The intervention plan focuses on improving fine motor precision and dynamic tripod grasp for functional handwriting."
-  },
-  {
-    id: 'p7',
-    category: 'peds',
-    english: "Child demonstrated persistent primitive reflexes, specifically the Asymmetrical Tonic Neck Reflex (ATNR), affecting bilateral hand integration.",
-    chinese: "兒童展現持續未整合之原始反射，特別是非對稱性緊張性頸反射 (ATNR)，影響了雙手整合動作。",
-    keywords: ["primitive reflexes", "ATNR", "bilateral integration"],
-    context: "兒童神經發展治療 (NDT) 評估紀錄。",
-    audioText: "Child demonstrated persistent primitive reflexes, specifically the Asymmetrical Tonic Neck Reflex, affecting bilateral hand integration."
-  },
-
-  // Mental Health & Psychosocial OT
-  {
-    id: 'p8',
-    category: 'psy',
-    english: "Client reports elevated cognitive fatigue during stress and successfully applies grounding techniques to enhance occupational focus.",
-    chinese: "個案主訴壓力下認知疲勞增加，並能成功運用著陸技巧 (Grounding) 來增進職能活動專注力。",
-    keywords: ["cognitive fatigue", "grounding techniques", "occupational focus"],
-    context: "心理衛生職能治療或創傷後壓力症候群個案衛教紀錄。",
-    audioText: "Client reports elevated cognitive fatigue during stress and successfully applies grounding techniques to enhance occupational focus."
-  },
-  {
-    id: 'p9',
-    category: 'psy',
-    english: "Participated in group cooking activity to practice time management, social interaction, and dynamic task-simplification strategies.",
-    chinese: "參與團體烹飪活動以練習時間管理、社交互動及動態任務簡化策略。",
-    keywords: ["group cooking activity", "task-simplification", "social interaction"],
-    context: "日間病房或精神復健機構團體治療目標與紀錄。",
-    audioText: "Participated in group cooking activity to practice time management, social interaction, and dynamic task simplification strategies."
-  },
-
-  // Assistive Technology & Ergonomics
-  {
-    id: 'p10',
-    category: 'assistive',
-    english: "Custom thermoplastic resting hand splint was fabricated to maintain functional hand positioning and prevent wrist flexion contractures.",
-    chinese: "製作客製化熱塑性靜止型手副木，以維持功能性手部姿勢並預防手腕屈曲攣縮。",
-    keywords: ["resting hand splint", "thermoplastic", "flexion contractures"],
-    context: "副木評估與製作報告描繪。",
-    audioText: "Custom thermoplastic resting hand splint was fabricated to maintain functional hand positioning and prevent wrist flexion contractures."
-  },
-  {
-    id: 'p11',
-    category: 'assistive',
-    english: "Recommended ergonomic office adaptations including a tilt-in-space chair, dynamic monitor arm, and split keyboard for repetitive strain prevention.",
-    chinese: "建議人因工程辦公環境調整，包含仰角調整椅、動態螢幕支架與分體式鍵盤，以預防重複性勞損。",
-    keywords: ["ergonomic adaptations", "tilt-in-space", "repetitive strain"],
-    context: "人因工程職場評估與改善建議報告。",
-    audioText: "Recommended ergonomic office adaptations including a tilt in space chair, dynamic monitor arm, and split keyboard for repetitive strain prevention."
-  },
-
-  // SOAP Documentation
-  {
-    id: 'p12',
-    category: 'soap',
-    english: "S: Client states, 'I cannot button my shirt without my fingers feeling numb and weak.'",
-    chinese: "S (主觀描述): 個案表示「我扣襯衫鈕扣時手指感到麻木無力。」",
-    keywords: ["S (Subjective)", "numbness", "button shirt"],
-    context: "SOAP 病歷紀錄之個案主訴傳達法。",
-    audioText: "Subjective: Client states, I cannot button my shirt without my fingers feeling numb and weak."
-  },
-  {
-    id: 'p13',
-    category: 'soap',
-    english: "O: Client performed 15 minutes of upper extremity pegboard training requiring Moderate Assistance (Mod A) for fine motor placement.",
-    chinese: "O (客觀紀錄): 個案進行 15 分鐘上肢插棒盤訓練，在精細動作放置上需要中度協助 (Mod A)。",
-    keywords: ["O (Objective)", "Moderate Assistance (Mod A)", "pegboard"],
-    context: "SOAP 病歷客觀紀錄可量化治療介入項目與協助等級。",
-    audioText: "Objective: Client performed 15 minutes of upper extremity pegboard training requiring Moderate Assistance for fine motor placement."
-  },
-  {
-    id: 'p14',
-    category: 'soap',
-    english: "A: Client's impaired sensory feedback and 3/5 MMT grip strength limit independent meal preparation and safety in kitchen IADLs.",
-    chinese: "A (臨床評估): 個案感官回饋受損與 3/5 分之徒手肌力限制了其獨立備餐及廚房 IADLs 操作之安全性。",
-    keywords: ["A (Assessment)", "MMT grip strength", "IADLs safety"],
-    context: "SOAP 病歷 A 部分：連結功能限制與職能表現障礙之臨床推論。",
-    audioText: "Assessment: Client's impaired sensory feedback and 3 over 5 MMT grip strength limit independent meal preparation and safety in kitchen IADLs."
-  },
-  {
-    id: 'p15',
-    category: 'soap',
-    english: "P: Continue OT 3x/week for 4 weeks focusing on sensory re-education, compensatory adaptive equipment, and home hazard modification.",
-    chinese: "P (計畫): 繼續每週 3 次職能治療共 4 週，著重於感覺再教育、補償性輔具使用與居家安全環境改造。",
-    keywords: ["P (Plan)", "sensory re-education", "home modification"],
-    context: "SOAP 病歷 P 部分：擬定明確治療頻率與目標導向項目。",
-    audioText: "Plan: Continue OT 3 times a week for 4 weeks focusing on sensory re-education, compensatory adaptive equipment, and home hazard modification."
-  }
-];
-
-const ARTICLES = [
-  {
-    id: 'art1',
-    title: "Post-Stroke Upper Extremity Constraint-Induced Movement Therapy (CIMT) & ADL Retraining",
-    subtitle: "腦中風後上肢強制誘發運動治療與日常生活活動再訓練案例",
-    category: "adult",
-    readTime: "6 min",
-    difficulty: "Advanced",
-    paragraphs: [
-      {
-        id: 1,
-        en: "Stroke remains a major cause of adult motor disability worldwide. Post-stroke hemiparesis severely impairs upper extremity (UE) function, creating profound occupational performance deficits in Instrumental Activities of Daily Living (IADLs) such as meal preparation, laundry, and financial management.",
-        zh: "腦中風仍是全球成人運動失能的主要原因。中風後的偏癱嚴重損害了上肢 (UE) 功能，造成工具性日常生活活動 (IADLs) 如備餐、洗衣服和理財等職能表現的嚴重障礙。",
-        vocab: [
-          { word: "hemiparesis", definition: "偏癱 / 輕癱", phonetic: "/ˌhem.i.pəˈriː.sɪs/" },
-          { word: "IADLs", definition: "工具性日常生活活動 (Instrumental Activities of Daily Living)", phonetic: "I-A-D-Ls" }
-        ]
-      },
-      {
-        id: 2,
-        en: "Constraint-Induced Movement Therapy (CIMT) is a high-evidence neurological intervention designed to counteract 'learned non-use'. By placing a protective constraint mitt on the non-affected limb for up to 90% of waking hours, the therapist forces high-intensity, task-oriented shaping of the paretic upper extremity.",
-        zh: "強制誘發運動治療 (CIMT) 是一種具備高實證等級的神經復健介入法，旨在對抗『習得廢用』。透過在清醒時間高達 90% 的時間內將防護手套配戴於健側肢體，治療師能強制患者以輕癱側上肢進行高強度、任務導向的塑造練習 (Shaping)。",
-        vocab: [
-          { word: "learned non-use", definition: "習得廢用 (因習慣依賴健側而致患側功能退化)", phonetic: "/lɜːnd nɒn juːs/" },
-          { word: "paretic limb", definition: "輕癱側肢體 / 患側", phonetic: "/pəˈret.ɪk lɪm/" },
-          { word: "shaping", definition: "塑造技巧 (逐步增加任務難度的行為改變技術)", phonetic: "/ˈʃeɪ.pɪŋ/" }
-        ]
-      },
-      {
-        id: 3,
-        en: "Progressive functional assessments using the Fugl-Meyer Assessment (FMA) and Action Research Arm Test (ARAT) demonstrated statistically significant gains in grasp, pinch, and distal motor control after a intensive 2-week intervention protocol.",
-        zh: "經過兩週的高強度療程後，經由 Fugl-Meyer 動作評估 (FMA) 與動作研究臂測試 (ARAT) 等漸進式功能評估顯示，個案在抓握、捏握以及遠端動作控制方面均展現統計上顯著的進步。",
-        vocab: [
-          { word: "Fugl-Meyer Assessment (FMA)", definition: "中風動作功能評估表 (評估肢體復原階段)", phonetic: "FMA" },
-          { word: "ARAT", definition: "動作研究臂測試 (Action Research Arm Test)", phonetic: "A-R-A-T" }
-        ]
-      }
-    ],
-    quiz: [
-      {
-        id: 'q1',
-        question: "What core clinical phenomenon does CIMT specifically target and aim to overcome?",
-        options: [
-          "Hypoactive stretch reflexes",
-          "Learned non-use of the affected extremity",
-          "Cognitive agnosia",
-          "Sensory aphasia"
-        ],
-        correct: 1,
-        rationale: "CIMT focuses on forcing the patient to use the paretic arm, overcoming the habit of relying solely on the healthy arm ('learned non-use')."
-      },
-      {
-        id: 'q2',
-        question: "Which standardized outcome measures were used to assess upper extremity recovery?",
-        options: [
-          "MoCA and MMSE",
-          "Fugl-Meyer Assessment (FMA) and ARAT",
-          "GCS and Barthel Index",
-          "PEDI and SPM"
-        ],
-        correct: 1,
-        rationale: "FMA and ARAT are gold-standard quantitative measures for post-stroke upper limb motor recovery."
-      }
-    ]
-  },
-  {
-    id: 'art2',
-    title: "Sensory Processing Disorder (SPD) & Classroom Accommodations in Pediatric OT",
-    subtitle: "兒童職能治療：感覺處理障礙與教室適應策略性介入",
-    category: "peds",
-    readTime: "5 min",
-    difficulty: "Medium",
-    paragraphs: [
-      {
-        id: 1,
-        en: "Children diagnosed with Sensory Processing Disorder (SPD) often struggle with sensory modulation, manifesting as either sensory over-responsiveness (hyper-reactivity) or sensory under-responsiveness (hypo-reactivity) across visual, tactile, and vestibular domains.",
-        zh: "被診斷為感覺處理障礙 (SPD) 的兒童常在感覺調節上面臨困難，於視覺、觸覺及前庭覺等領域表現出感覺過度反應 (過敏) 或感覺反應過低 (遲鈍)。",
-        vocab: [
-          { word: "sensory modulation", definition: "感覺調節能力", phonetic: "/ˈsen.sər.i ˌmɒd.jəˈleɪ.ʃən/" },
-          { word: "hyper-reactivity", definition: "感覺過度反應 / 過敏", phonetic: "/ˈhaɪ.pər ri.ækˈtɪv.ə.ti/" }
-        ]
-      },
-      {
-        id: 2,
-        en: "An Occupational Therapist designs a individualized 'Sensory Diet'—a structured schedule of sensory input activities integrated into the school day. Proprioceptive 'heavy work' activities, such as carrying books or wall push-ups, help maintain an optimal state of arousal for classroom engagement.",
-        zh: "職能治療師會設計客製化的『感覺飲食』(Sensory Diet)— 一套整合至學校日程中的結構化感覺輸入活動。例如搬運重物或推牆等本體覺『重工作』活動，有助於維繫最佳警覺狀態 (Arousal State) 以利課堂參與。",
-        vocab: [
-          { word: "Sensory Diet", definition: "感覺飲食 (安排適當感覺輸入之日程計畫)", phonetic: "/ˈsen.sər.i ˈdaɪ.ət/" },
-          { word: "heavy work", definition: "重工作活動 (提供肌肉與關節本體覺刺激的活動)", phonetic: "/ˈhev.i wɜːk/" },
-          { word: "arousal state", definition: "警覺狀態 / 喚醒程度", phonetic: "/əˈraʊ.zəl steɪt/" }
-        ]
-      }
-    ],
-    quiz: [
-      {
-        id: 'q1',
-        question: "Why are proprioceptive 'heavy work' tasks prescribed in a Sensory Diet?",
-        options: [
-          "To exhaust the child so they sleep during class.",
-          "To provide organizing sensory input that helps maintain an optimal arousal level.",
-          "To increase cardiovascular endurance exclusively.",
-          "To replace handwriting practice completely."
-        ],
-        correct: 1,
-        rationale: "Proprioceptive input (heavy work) acts as a regulating force, helping modulate both hyper- and hypo-reactivity to sustain attention."
-      }
-    ]
-  },
-  {
-    id: 'art3',
-    title: "Psychosocial Routine Restructuring and Occupational Balance in Mental Health",
-    subtitle: "心理職能治療：日常生活作息重塑與職能平衡 (Occupational Balance)",
-    category: "psy",
-    readTime: "5 min",
-    difficulty: "Medium",
-    paragraphs: [
-      {
-        id: 1,
-        en: "Severe mental health conditions often disrupt daily routines, resulting in occupational alienation and imbalance. Psychosocial OT intervention utilizes the Person-Environment-Occupation (PEO) model to evaluate how personal volumetric drives, environmental stressors, and task demands align.",
-        zh: "嚴重的心理健康狀況常破壞日常生活作息，導致職能異化與不平衡。心理衛生 OT 介入運用『人-環境-職能』(PEO) 模式，評估個人動機意志、環境壓力源與任務需求之間的交集配合情況。",
-        vocab: [
-          { word: "occupational balance", definition: "職能平衡 (工作、休閒、自我照顧與休息之平衡)", phonetic: "/ˌɒk.jəˈpeɪ.ʃən.əl ˈbæl.əns/" },
-          { word: "PEO Model", definition: "Person-Environment-Occupation (人-環境-職能模式)", phonetic: "P-E-O Model" }
-        ]
-      },
-      {
-        id: 2,
-        en: "Through routine restructuring and cognitive reframing, clients co-create achievable schedules that integrate self-care, productive activities, and meaningful leisure, fostering self-efficacy and community reintegration.",
-        zh: "透過作息重塑與認知重塑，個案與治療師共同創建包含自我照顧、生產性活動與具意義之休閒的可行日程表，藉此培養自我效能並促進社區重構與再融合。",
-        vocab: [
-          { word: "self-efficacy", definition: "自我效能感", phonetic: "/ˌself.ef.ɪ.kə.si/" },
-          { word: "routine restructuring", definition: "日常生活作息重塑", phonetic: "/ruːˈtiːn ˌriːˈstrʌk.tʃər.ɪŋ/" }
-        ]
-      }
-    ],
-    quiz: [
-      {
-        id: 'q1',
-        question: "According to the PEO model, optimal occupational performance occurs when:",
-        options: [
-          "The therapist takes complete control of the patient's schedule.",
-          "There is maximum fit and harmony between Person, Environment, and Occupation.",
-          "All physical environments are removed.",
-          "The patient focuses solely on work activities."
-        ],
-        correct: 1,
-        rationale: "The PEO model states that occupational performance improves when the congruence between person, environment, and occupation increases."
-      }
-    ]
-  },
-  {
-    id: 'art4',
-    title: "C6 Spinal Cord Injury (SCI): Adaptive Equipment & Transfer Autonomy",
-    subtitle: "C6 頸髓損傷：適應性輔具運用與轉位自主性訓練",
-    category: "assistive",
-    readTime: "6 min",
-    difficulty: "Advanced",
-    paragraphs: [
-      {
-        id: 1,
-        en: "Individuals with cervical spinal cord injury at the C6 level preserve wrist extension due to intact Extensor Carpi Radialis Longus/Brevis innervation, allowing for a functional 'Tenodesis Grasp' despite lacking active finger flexor activation.",
-        zh: "C6 節段頸髓損傷個案因保有橈側伸腕長/短肌的神經支配，可保留主動伸腕能力。雖然缺乏主動屈指肌功能，但能透過『肌腱作用抓握』(Tenodesis Grasp) 達成功能性手部操作。",
-        vocab: [
-          { word: "Tenodesis Grasp", definition: "肌腱作用抓握 (利用伸腕帶動手指被動屈曲抓握)", phonetic: "/təˈnɒd.ə.sɪs ɡræsp/" },
-          { word: "wrist extension", definition: "手腕伸展", phonetic: "/rɪst ɪkˈsten.ʃən/" }
-        ]
-      },
-      {
-        id: 2,
-        en: "OT intervention focuses on preserving dynamic tenodesis tightness, prescribing universal cuffs, adaptive eating utensils, and training slide board transfers to establish functional independence in level surface bed-to-wheelchair movements.",
-        zh: "職能治療介入著重於維持肌腱作用的緊實度、處方萬能手套 (Universal Cuff)、適應性進食餐具，並訓練滑板轉位 (Slide Board Transfer)，以建立床到輪椅平面轉位的獨立性。",
-        vocab: [
-          { word: "Universal Cuff", definition: "萬能手套 / 輔助套手環 (套接餐具或筆)", phonetic: "/ˌjuː.nɪˈvɜː.səl kʌf/" },
-          { word: "Slide Board Transfer", definition: "滑板轉位法", phonetic: "/slaɪd bɔːd ˈtræn.sfɜːr/" }
-        ]
-      }
-    ],
-    quiz: [
-      {
-        id: 'q1',
-        question: "What muscle action makes the functional 'Tenodesis Grasp' possible in a C6 SCI patient?",
-        options: [
-          "Active finger flexion",
-          "Active wrist extension",
-          "Active elbow extension (Triceps)",
-          "Active thumb opposition"
-        ],
-        correct: 1,
-        rationale: "Wrist extension tightens finger flexor tendons passively, causing the fingers to flex into a functional grip."
-      }
-    ]
-  }
-];
-
-const GLOSSARY = [
-  // Biomechanical & Neurological
-  { term: "AROM", fullText: "Active Range of Motion", category: "Biomechanical", definition: "主動關節活動度：肌肉在無外力協助下主動收縮所能帶動的最大關節角度。" },
-  { term: "PROM", fullText: "Passive Range of Motion", category: "Biomechanical", definition: "被動關節活動度：外力完全施加下所能達到的最大關節活動角度。" },
-  { term: "MMT", fullText: "Manual Muscle Testing", category: "Biomechanical", definition: "徒手肌力檢查：將肌力分為 0 (Zero) 到 5 (Normal) 分之標準臨床測試。" },
-  { term: "MAS", fullText: "Modified Ashworth Scale", category: "Neurological", definition: "改良式艾希沃斯量表：評估肌肉中風或腦傷後痙攣張力 (Spasticity) 之臨床金標準 (0 到 4 分)。" },
-  { term: "PNF", fullText: "Proprioceptive Neuromuscular Facilitation", category: "Neurological", definition: "本體感覺神經肌肉促進術：利用對角線螺旋動作模式誘發神經肌肉反應。" },
-  { term: "NDT", fullText: "Neuro-Developmental Treatment (Bobath)", category: "Neurological", definition: "神經發展治療學派：強調整體姿態控制與抑制異常張力反射。" },
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>職能治療專業英文學習網 | OT Medical English Hub</title>
   
-  // Assessments & Frameworks
-  { term: "OTPF-4", fullText: "Occupational Therapy Practice Framework 4th Ed.", category: "Framework", definition: "美國職能治療學會第 4 版實踐框架：明確劃分 Domain (領域) 與 Process (過程)。" },
-  { term: "PEO Model", fullText: "Person-Environment-Occupation Model", category: "Theory", definition: "人-環境-職能模式：解析個案特質、物理/社會環境與活動需求三者之動態契合度。" },
-  { term: "MOHO", fullText: "Model of Human Occupation", category: "Theory", definition: "人類職能模式：強調意志 (Volition)、習慣 (Habituation) 與執行能力 (Performance Capacity)。" },
-  { term: "COPM", fullText: "Canadian Occupational Performance Measure", category: "Assessment", definition: "加拿大職能表現量表：以個案為中心，評估個案自我感知之表現滿意度與重要性。" },
-  { term: "FIM", fullText: "Functional Independence Measure", category: "Assessment", definition: "功能獨立性量表：18 項包含日常生活與認知功能的 1 至 7 分協助等級評估法。" },
-  { term: "MoCA", fullText: "Montreal Cognitive Assessment", category: "Assessment", definition: "蒙特利爾認知評估量表：快速篩檢執行功能、記憶力與空間知覺的認知工具。" },
-  { term: "Barthel Index", fullText: "Barthel Index of ADL", category: "Assessment", definition: "巴氏量表：評估日常生活基本自理能力 (0-100 分) 之國際臨床工具。" },
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
   
-  // Daily Living (Domain)
-  { term: "ADL", fullText: "Activities of Daily Living (BADL)", category: "Occupational Domain", definition: "基本日常生活活動：如進食、穿衣、沐浴、個人衛生、個人轉位、上廁所。" },
-  { term: "IADL", fullText: "Instrumental Activities of Daily Living", category: "Occupational Domain", definition: "工具性日常生活活動：如社區移動、備餐、購物、家務維護、服藥與財務管理。" },
-  
-  // Assistance Levels
-  { term: "Ind (Independent)", fullText: "Independent", category: "Documentation", definition: "完全獨立：無需任何輔具或協助即可安全完成活動。" },
-  { term: "Mod I", fullText: "Modified Independent", category: "Documentation", definition: "改良式獨立：需耗費較長時間或需輔具才能完成活動。" },
-  { term: "Min A", fullText: "Minimal Assistance", category: "Documentation", definition: "輕度協助：個案能承擔 75% 以上體力，治療師給予 25% 以下協助。" },
-  { term: "Mod A", fullText: "Moderate Assistance", category: "Documentation", definition: "中度協助：個案能承擔 50% 至 74% 體力，治療師提供 25%-50% 協助。" },
-  { term: "Max A", fullText: "Maximal Assistance", category: "Documentation", definition: "重度協助：個案僅能承擔 25% 至 49% 體力，治療師提供 50%-75% 協助。" },
-  { term: "Total A / Dep", fullText: "Total Assistance / Dependent", category: "Documentation", definition: "完全協助 / 完全依賴：個案承擔低於 25% 體力，需要兩人或完全替其操作。" }
-];
+  <!-- React 18 & ReactDOM (Production UMD) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 
-const SOAP_BUILDER_DATA = {
-  S: {
-    title: "Subjective (S) - 主觀描述與主訴",
-    options: [
-      { text: "Client states, 'I get sharp pain in my shoulder when reaching overhead for groceries.'", translation: "個案表示『高舉手臂拿雜物時肩部會劇痛。』", score: 10 },
-      { text: "Client denies pain today but expresses frustration about needing help for toilet transfers.", translation: "個案否定今日疼痛，但對上廁所轉位需要協助感到挫折。", score: 10 },
-      { text: "Client reports sleeping 8 hours without interruption.", translation: "個案回報連續睡眠8小時。", score: 5 }
-    ]
-  },
-  O: {
-    title: "Objective (O) - 客觀數據與介入過程",
-    options: [
-      { text: "Client completed 20 minutes of dynamic balance training and required Moderate Assistance (Mod A) for tub bench transfers.", translation: "個案完成20分鐘動態平衡訓練，在浴缸轉位椅轉位時需中度協助 (Mod A)。", score: 10 },
-      { text: "Patient demonstrated right grip strength of 15 lbs with a dynomometer.", translation: "患者以握力器測得右手握力為 15 磅。", score: 10 }
-    ]
-  },
-  A: {
-    title: "Assessment (A) - 臨床推論與職能障礙分析",
-    options: [
-      { text: "Client's decreased fine motor precision and 3/5 grip strength limit independent buttoning during dressing tasks.", translation: "個案的精細動作精準度降低與 3/5 肌力限制了其在穿衣任務中獨立扣鈕扣的能力。", score: 10 },
-      { text: "Patient is making steady progress toward home safety goals.", translation: "患者正穩健朝居家安全目標邁進。", score: 6 }
-    ]
-  },
-  P: {
-    title: "Plan (P) - 未來治療計畫與頻率",
-    options: [
-      { text: "Continue skilled OT 45 mins/session, 3x/week for 3 weeks focusing on adaptive tool use and home safety hazard modification.", translation: "繼續進行專業 OT 每次45分鐘、每週3次共3週，著重於適應性工具使用與居家安全改善。", score: 10 },
-      { text: "Re-evaluate in 2 months.", translation: "2個月後重新評估。", score: 4 }
-    ]
-  }
-};
+  <!-- Babel Standalone (JSX support in browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('phrases'); // 'phrases' | 'reading' | 'soap' | 'glossary' | 'flashcards' | 'bookmarks'
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [speechRate, setSpeechRate] = useState(0.9);
-
-  // Persistence State
-  const [bookmarkedIds, setBookmarkedIds] = useState(() => {
-    const saved = localStorage.getItem('ot_bookmarks_v2');
-    return saved ? JSON.parse(saved) : ['p1', 'art1'];
-  });
-
-  const [masteredIds, setMasteredIds] = useState(() => {
-    const saved = localStorage.getItem('ot_mastered_v2');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Reading Article State
-  const [currentArticleId, setCurrentArticleId] = useState('art1');
-  const [showChineseArticle, setShowChineseArticle] = useState(true);
-  const [activeVocabModal, setActiveVocabModal] = useState(null);
-  const [quizAnswers, setQuizAnswers] = useState({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-
-  // SOAP Builder State
-  const [soapSelections, setSoapSelections] = useState({ S: 0, O: 0, A: 0, P: 0 });
-  const [copiedSoap, setCopiedSoap] = useState(false);
-
-  // Flashcards State
-  const [cardIndex, setCardIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem('ot_bookmarks_v2', JSON.stringify(bookmarkedIds));
-  }, [bookmarkedIds]);
-
-  useEffect(() => {
-    localStorage.setItem('ot_mastered_v2', JSON.stringify(masteredIds));
-  }, [masteredIds]);
-
-  // TTS helper
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = speechRate;
-      window.speechSynthesis.speak(utterance);
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap');
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
-  };
+    .font-serif {
+      font-family: 'Merriweather', Georgia, serif;
+    }
+    .scrollbar-none::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-none {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+  <div id="root"></div>
 
-  const toggleBookmark = (id) => {
-    setBookmarkedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- Standalone SVG Icon Components (Zero external icon library dependency) ---
+    const IconWrapper = ({ children, className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        {children}
+      </svg>
     );
-  };
 
-  const toggleMastered = (id) => {
-    setMasteredIds(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
+    const HeartPulse = (p) => <IconWrapper {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" /></IconWrapper>;
+    const Activity = (p) => <IconWrapper {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></IconWrapper>;
+    const Baby = (p) => <IconWrapper {...p}><path d="M9 12h.01M15 12h.01"/><path d="M10 16c.5.5 1.5 1 2 1s1.5-.5 2-1"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 5 6.3"/><path d="M12 2a4 4 0 0 1 4 4c0 1.1-.9 2-2 2h-4a2 2 0 0 1-2-2 4 4 0 0 1 4-4z"/></IconWrapper>;
+    const Brain = (p) => <IconWrapper {...p}><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" /></IconWrapper>;
+    const Sliders = (p) => <IconWrapper {...p}><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></IconWrapper>;
+    const FileText = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></IconWrapper>;
+    const BookOpen = (p) => <IconWrapper {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></IconWrapper>;
+    const GraduationCap = (p) => <IconWrapper {...p}><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></IconWrapper>;
+    const Layers = (p) => <IconWrapper {...p}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></IconWrapper>;
+    const Bookmark = ({ fill, ...p }) => <IconWrapper {...p}><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" fill={fill ? "currentColor" : "none"} /></IconWrapper>;
+    const Volume2 = (p) => <IconWrapper {...p}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></IconWrapper>;
+    const Search = (p) => <IconWrapper {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></IconWrapper>;
+    const CheckCircle2 = (p) => <IconWrapper {...p}><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></IconWrapper>;
+    const Sparkles = (p) => <IconWrapper {...p}><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" /></IconWrapper>;
+    const Award = (p) => <IconWrapper {...p}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></IconWrapper>;
+    const Check = (p) => <IconWrapper {...p}><polyline points="20 6 9 17 4 12" /></IconWrapper>;
+    const Copy = (p) => <IconWrapper {...p}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></IconWrapper>;
 
-  // Filtered Phrases
-  const filteredPhrases = useMemo(() => {
-    return PHRASES.filter(p => {
-      const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
-      const matchSearch = p.english.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.chinese.includes(searchTerm) ||
-                          p.keywords.some(k => k.toLowerCase().includes(searchTerm.toLowerCase()));
-      return matchCat && matchSearch;
-    });
-  }, [selectedCategory, searchTerm]);
+    // --- DATA ---
+    const CATEGORIES = [
+      { id: 'all', name: '全部分類', Icon: Activity },
+      { id: 'adult', name: '成人生理職能治療', Icon: HeartPulse },
+      { id: 'peds', name: '兒童與早期療育', Icon: Baby },
+      { id: 'psy', name: '心理職能治療', Icon: Brain },
+      { id: 'assistive', name: '輔具與人因工程', Icon: Sliders },
+      { id: 'soap', name: '病歷寫作句型', Icon: FileText },
+    ];
 
-  // Current selected article
-  const currentArticle = ARTICLES.find(a => a.id === currentArticleId) || ARTICLES[0];
+    const PHRASES = [
+      {
+        id: 'p1',
+        category: 'adult',
+        english: "The patient demonstrates decreased active range of motion (AROM) in the right shoulder due to spasticity and hypertonicity.",
+        chinese: "患者因痙攣與肌張力過高，導致右肩主動關節活動度 (AROM) 降低。",
+        keywords: ["AROM", "hypertonicity", "spasticity"],
+        context: "中風或腦傷上肢評估紀錄，描述關節活動受限主因。"
+      },
+      {
+        id: 'p2',
+        category: 'adult',
+        english: "Client requires minimal assistance (Min A) of 1 for standing balance during upper extremity dressing.",
+        chinese: "個案在上肢穿衣過程中需要單人輕度協助 (Min A) 以維持站立平衡。",
+        keywords: ["Min A", "standing balance", "UE dressing"],
+        context: "評估日常穿衣獨立度與站立平衡表現。"
+      },
+      {
+        id: 'p3',
+        category: 'adult',
+        english: "Prior to discharge, the client achieved full independence in basic ADLs utilizing energy conservation techniques.",
+        chinese: "出院前，個案運用省力策略 (Energy Conservation) 達成了基本日常生活活動 (ADLs) 的完全獨立。",
+        keywords: ["discharge", "ADLs", "energy conservation"],
+        context: "心肺復健或慢性病出院準備評估報告寫作。"
+      },
+      {
+        id: 'p4',
+        category: 'adult',
+        english: "Instructed client in proper dynamic tub-bench transfer techniques to prevent weight-bearing violations on the affected hip.",
+        chinese: "指導個案正確的動態浴缸轉位椅轉位技巧，以避免患側髖關節過度承重違反醫囑限制。",
+        keywords: ["tub-bench transfer", "weight-bearing", "affected hip"],
+        context: "髖關節置換術 (THA) 後轉位指導術語。"
+      },
+      {
+        id: 'p5',
+        category: 'peds',
+        english: "Child exhibits tactile defensiveness when exposed to textured art materials and requires heavy proprioceptive input to self-regulate.",
+        chinese: "兒童在接觸不同材質的美勞材料時展現觸覺防禦，且需要高強度的本體覺輸入來自我調節。",
+        keywords: ["tactile defensiveness", "proprioceptive input", "self-regulate"],
+        context: "感覺統合 (SI) 評估與介入紀錄專用表達。"
+      },
+      {
+        id: 'p6',
+        category: 'peds',
+        english: "The intervention plan focuses on improving fine motor precision and dynamic tripod grasp for functional handwriting.",
+        chinese: "介入計畫著重於提升精細動作精準度與動態三指握姿，以增進功能性握筆書寫能力。",
+        keywords: ["fine motor precision", "dynamic tripod grasp", "handwriting"],
+        context: "學齡前兒童握筆發展遲緩評估與目標設定。"
+      },
+      {
+        id: 'p7',
+        category: 'psy',
+        english: "Client reports elevated cognitive fatigue during stress and successfully applies grounding techniques to enhance occupational focus.",
+        chinese: "個案主訴壓力下認知疲勞增加，並能成功運用著陸技巧 (Grounding) 來增進職能活動專注力。",
+        keywords: ["cognitive fatigue", "grounding techniques", "occupational focus"],
+        context: "心理衛生職能治療或創傷後壓力症候群個案衛教紀錄。"
+      },
+      {
+        id: 'p8',
+        category: 'assistive',
+        english: "Custom thermoplastic resting hand splint was fabricated to maintain functional hand positioning and prevent wrist flexion contractures.",
+        chinese: "製作客製化熱塑性靜止型手副木，以維持功能性手部姿勢並預防手腕屈曲攣縮。",
+        keywords: ["resting hand splint", "thermoplastic", "flexion contractures"],
+        context: "副木評估與製作報告描繪。"
+      },
+      {
+        id: 'p9',
+        category: 'soap',
+        english: "S: Client states, 'I cannot button my shirt without my fingers feeling numb and weak.'",
+        chinese: "S (主觀描述): 個案表示「我扣襯衫鈕扣時手指感到麻木無力。」",
+        keywords: ["S (Subjective)", "numbness", "button shirt"],
+        context: "SOAP 病歷紀錄之個案主訴傳達法。"
+      },
+      {
+        id: 'p10',
+        category: 'soap',
+        english: "O: Client performed 15 minutes of upper extremity pegboard training requiring Moderate Assistance (Mod A) for fine motor placement.",
+        chinese: "O (客觀紀錄): 個案進行 15 分鐘上肢插棒盤訓練，在精細動作放置上需要中度協助 (Mod A)。",
+        keywords: ["O (Objective)", "Mod A", "pegboard"],
+        context: "SOAP 病歷客觀紀錄可量化治療介入項目與協助等級。"
+      }
+    ];
 
-  // Constructed SOAP text
-  const builtSoapText = useMemo(() => {
-    const s = SOAP_BUILDER_DATA.S.options[soapSelections.S]?.text || '';
-    const o = SOAP_BUILDER_DATA.O.options[soapSelections.O]?.text || '';
-    const a = SOAP_BUILDER_DATA.A.options[soapSelections.A]?.text || '';
-    const p = SOAP_BUILDER_DATA.P.options[soapSelections.P]?.text || '';
-    return `${s}\n\n${o}\n\n${a}\n\n${p}`;
-  }, [soapSelections]);
+    const ARTICLES = [
+      {
+        id: 'art1',
+        title: "Post-Stroke Upper Extremity CIMT & ADL Retraining",
+        subtitle: "腦中風後上肢強制誘發運動治療與日常生活活動再訓練案例",
+        category: "adult",
+        readTime: "6 min",
+        difficulty: "Advanced",
+        paragraphs: [
+          {
+            id: 1,
+            en: "Stroke remains a major cause of adult motor disability worldwide. Post-stroke hemiparesis severely impairs upper extremity (UE) function, creating profound occupational performance deficits in Instrumental Activities of Daily Living (IADLs) such as meal preparation, laundry, and financial management.",
+            zh: "腦中風仍是全球成人運動失能的主要原因。中風後的偏癱嚴重損害了上肢 (UE) 功能，造成工具性日常生活活動 (IADLs) 如備餐、洗衣服和理財等職能表現的嚴重障礙。",
+            vocab: [
+              { word: "hemiparesis", definition: "偏癱 / 輕癱", phonetic: "/ˌhem.i.pəˈriː.sɪs/" },
+              { word: "IADLs", definition: "工具性日常生活活動 (Instrumental Activities of Daily Living)", phonetic: "I-A-D-Ls" }
+            ]
+          },
+          {
+            id: 2,
+            en: "Constraint-Induced Movement Therapy (CIMT) is a high-evidence neurological intervention designed to counteract 'learned non-use'. By placing a protective constraint mitt on the non-affected limb for up to 90% of waking hours, the therapist forces high-intensity, task-oriented shaping of the paretic upper extremity.",
+            zh: "強制誘發運動治療 (CIMT) 是一種具備高實證等級的神經復健介入法，旨在對抗『習得廢用』。透過在清醒時間高達 90% 的時間內將防護手套配戴於健側肢體，治療師能強制患者以輕癱側上肢進行高強度、任務導向的塑造練習 (Shaping)。",
+            vocab: [
+              { word: "learned non-use", definition: "習得廢用 (因習慣依賴健側而致患側功能退化)", phonetic: "/lɜːnd nɒn juːs/" },
+              { word: "shaping", definition: "塑造技巧 (逐步增加任務難度的行為改變技術)", phonetic: "/ˈʃeɪ.pɪŋ/" }
+            ]
+          }
+        ],
+        quiz: [
+          {
+            id: 'q1',
+            question: "What core clinical phenomenon does CIMT specifically target and aim to overcome?",
+            options: [
+              "Hypoactive stretch reflexes",
+              "Learned non-use of the affected extremity",
+              "Cognitive agnosia",
+              "Sensory aphasia"
+            ],
+            correct: 1,
+            rationale: "CIMT focuses on forcing the patient to use the paretic arm, overcoming the habit of relying solely on the healthy arm ('learned non-use')."
+          }
+        ]
+      }
+    ];
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSoap(true);
-    setTimeout(() => setCopiedSoap(false), 2000);
-  };
+    const GLOSSARY = [
+      { term: "AROM", fullText: "Active Range of Motion", category: "Biomechanical", definition: "主動關節活動度：肌肉在無外力協助下主動收縮所能帶動的最大關節角度。" },
+      { term: "PROM", fullText: "Passive Range of Motion", category: "Biomechanical", definition: "被動關節活動度：外力完全施加下所能達到的最大關節活動角度。" },
+      { term: "MMT", fullText: "Manual Muscle Testing", category: "Biomechanical", definition: "徒手肌力檢查：將肌力分為 0 (Zero) 到 5 (Normal) 分之標準臨床測試。" },
+      { term: "MAS", fullText: "Modified Ashworth Scale", category: "Neurological", definition: "改良式艾希沃斯量表：評估肌肉中風或腦傷後痙攣張力 (Spasticity) 之臨床金標準。" },
+      { term: "OTPF-4", fullText: "Occupational Therapy Practice Framework 4th Ed.", category: "Framework", definition: "美國職能治療學會第 4 版實踐框架：明確劃分 Domain (領域) 與 Process (過程)。" },
+      { term: "ADL", fullText: "Activities of Daily Living", category: "Domain", definition: "基本日常生活活動：如進食、穿衣、沐浴、個人衛生、個人轉位、上廁所。" }
+    ];
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
-      {/* Header Bar */}
-      <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-teal-500/30">
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 flex flex-col lg:flex-row items-center justify-between gap-3">
-          
-          {/* Logo & Title */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('phrases')}>
-            <div className="bg-gradient-to-tr from-teal-500 to-emerald-400 p-2.5 rounded-xl text-slate-950 font-bold flex items-center justify-center shadow-lg shadow-teal-500/20">
-              <HeartPulse className="w-6 h-6 text-slate-950" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-                  OT Medical English Hub
-                </h1>
-                <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2 py-0.5 rounded-full font-medium">
-                  職能治療專業英文學習網
-                </span>
+    const SOAP_BUILDER_DATA = {
+      S: {
+        title: "Subjective (S) - 主觀描述",
+        options: [
+          { text: "Client states, 'I get sharp pain in my shoulder when reaching overhead for groceries.'", translation: "個案表示『高舉手臂拿雜物時肩部會劇痛。』" },
+          { text: "Client denies pain today but expresses frustration about needing help for toilet transfers.", translation: "個案否定今日疼痛，但對上廁所轉位需要協助感到挫折。" }
+        ]
+      },
+      O: {
+        title: "Objective (O) - 客觀數據",
+        options: [
+          { text: "Client completed 20 minutes of dynamic balance training and required Moderate Assistance (Mod A) for tub bench transfers.", translation: "個案完成20分鐘動態平衡訓練，在浴缸轉位椅轉位時需中度協助 (Mod A)。" },
+          { text: "Patient demonstrated right grip strength of 15 lbs with a dynamometer.", translation: "患者以握力器測得右手握力為 15 磅。" }
+        ]
+      },
+      A: {
+        title: "Assessment (A) - 臨床推論",
+        options: [
+          { text: "Client's decreased fine motor precision and 3/5 grip strength limit independent buttoning during dressing tasks.", translation: "個案的精細動作精準度降低與 3/5 肌力限制了其在穿衣任務中獨立扣鈕扣的能力。" }
+        ]
+      },
+      P: {
+        title: "Plan (P) - 未來治療計畫",
+        options: [
+          { text: "Continue skilled OT 45 mins/session, 3x/week for 3 weeks focusing on adaptive tool use and home safety hazard modification.", translation: "繼續進行專業 OT 每次45分鐘、每週3次共3週，著重於適應性工具使用與居家安全改善。" }
+        ]
+      }
+    };
+
+    // --- MAIN REACT COMPONENT ---
+    function App() {
+      const [activeTab, setActiveTab] = useState('phrases');
+      const [selectedCategory, setSelectedCategory] = useState('all');
+      const [searchTerm, setSearchTerm] = useState('');
+      const [speechRate, setSpeechRate] = useState(0.9);
+
+      const [bookmarkedIds, setBookmarkedIds] = useState(['p1']);
+      const [masteredIds, setMasteredIds] = useState([]);
+
+      const [showChineseArticle, setShowChineseArticle] = useState(true);
+      const [activeVocabModal, setActiveVocabModal] = useState(null);
+      const [quizAnswers, setQuizAnswers] = useState({});
+      const [quizSubmitted, setQuizSubmitted] = useState(false);
+
+      const [soapSelections, setSoapSelections] = useState({ S: 0, O: 0, A: 0, P: 0 });
+      const [copiedSoap, setCopiedSoap] = useState(false);
+
+      const [cardIndex, setCardIndex] = useState(0);
+      const [isFlipped, setIsFlipped] = useState(false);
+
+      const speakText = (text) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'en-US';
+          utterance.rate = speechRate;
+          window.speechSynthesis.speak(utterance);
+        }
+      };
+
+      const toggleBookmark = (id) => {
+        setBookmarkedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+      };
+
+      const toggleMastered = (id) => {
+        setMasteredIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+      };
+
+      const filteredPhrases = useMemo(() => {
+        return PHRASES.filter(p => {
+          const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
+          const matchSearch = p.english.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              p.chinese.includes(searchTerm);
+          return matchCat && matchSearch;
+        });
+      }, [selectedCategory, searchTerm]);
+
+      const builtSoapText = useMemo(() => {
+        const s = SOAP_BUILDER_DATA.S.options[soapSelections.S]?.text || '';
+        const o = SOAP_BUILDER_DATA.O.options[soapSelections.O]?.text || '';
+        const a = SOAP_BUILDER_DATA.A.options[soapSelections.A]?.text || '';
+        const p = SOAP_BUILDER_DATA.P.options[soapSelections.P]?.text || '';
+        return `S: ${s}\n\nO: ${o}\n\nA: ${a}\n\nP: ${p}`;
+      }, [soapSelections]);
+
+      const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text);
+        setCopiedSoap(true);
+        setTimeout(() => setCopiedSoap(false), 2000);
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="bg-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-teal-500/30">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col lg:flex-row items-center justify-between gap-3">
+              <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('phrases')}>
+                <div className="bg-gradient-to-tr from-teal-500 to-emerald-400 p-2.5 rounded-xl text-slate-950 font-bold flex items-center justify-center">
+                  <HeartPulse className="w-6 h-6 text-slate-950" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-bold text-white">OT Medical English Hub</h1>
+                    <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/40 px-2 py-0.5 rounded-full font-medium">
+                      職能治療英文
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">Clinical Terminology & SOAP Sandbox</p>
+                </div>
               </div>
-              <p className="text-xs text-slate-400">Clinical Terminology, SOAP Documentation & Case Studies</p>
-            </div>
-          </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 overflow-x-auto max-w-full">
-            <button
-              onClick={() => setActiveTab('phrases')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'phrases' ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>臨床短句庫</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('reading')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'reading' ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>案例深度閱讀</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('soap')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'soap' ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>SOAP實戰組裝</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('glossary')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'glossary' ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
-              }`}
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>OT專業大辭典</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('flashcards')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'flashcards' ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>字卡複習模式</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('bookmarks')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition relative ${
-                activeTab === 'bookmarks' ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
-              }`}
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              <span>收藏與統計</span>
-              {bookmarkedIds.length > 0 && (
-                <span className="ml-1 bg-amber-400 text-slate-950 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
-                  {bookmarkedIds.length}
-                </span>
-              )}
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Speech Rate Global Controller Bar */}
-      <div className="bg-slate-100 border-b border-slate-200 py-1.5 px-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs text-slate-600">
-          <div className="flex items-center space-x-2">
-            <Volume2 className="w-4 h-4 text-teal-600" />
-            <span className="font-semibold">語音朗讀速度 (TTS Rate):</span>
-            {[0.8, 0.9, 1.0, 1.2].map(rate => (
-              <button
-                key={rate}
-                onClick={() => setSpeechRate(rate)}
-                className={`px-2 py-0.5 rounded-md font-mono text-[11px] transition ${
-                  speechRate === rate ? 'bg-teal-600 text-white font-bold' : 'bg-white border border-slate-300 hover:bg-slate-200'
-                }`}
-              >
-                {rate}x
-              </button>
-            ))}
-          </div>
-          <div className="hidden sm:flex items-center space-x-3 text-[11px] text-slate-500">
-            <span>已掌握句型: <strong className="text-emerald-600">{masteredIds.length}</strong> / {PHRASES.length}</span>
-            <span>已收藏項目: <strong className="text-amber-600">{bookmarkedIds.length}</strong></span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
-
-        {/* --- MODULE 1: CLINICAL PHRASES --- */}
-        {activeTab === 'phrases' && (
-          <div className="space-y-6">
-            {/* Filter & Search Header */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
-                {CATEGORIES.map(cat => {
-                  const Icon = cat.icon;
-                  const isSelected = selectedCategory === cat.id;
+              {/* Navigation Tabs */}
+              <nav className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 overflow-x-auto max-w-full">
+                {[
+                  { id: 'phrases', name: '臨床短句庫', Icon: Activity },
+                  { id: 'reading', name: '案例閱讀', Icon: BookOpen },
+                  { id: 'soap', name: 'SOAP組裝', Icon: FileText },
+                  { id: 'glossary', name: 'OT辭典', Icon: GraduationCap },
+                  { id: 'flashcards', name: '字卡複習', Icon: Layers },
+                  { id: 'bookmarks', name: '收藏夾', Icon: Bookmark, badge: bookmarkedIds.length }
+                ].map(tab => {
+                  const TabIcon = tab.Icon;
+                  const isActive = activeTab === tab.id;
                   return (
                     <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm whitespace-nowrap transition ${
-                        isSelected 
-                          ? 'bg-teal-700 text-white font-medium shadow-sm' 
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        isActive ? 'bg-teal-500 text-slate-950 shadow' : 'text-slate-300 hover:bg-slate-700/60'
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span>{cat.name}</span>
+                      <TabIcon className="w-3.5 h-3.5" />
+                      <span>{tab.name}</span>
+                      {tab.badge > 0 && (
+                        <span className="ml-1 bg-amber-400 text-slate-950 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                          {tab.badge}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
-              </div>
-
-              <div className="relative w-full md:w-72">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="搜尋短句、評估術語或中文..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition"
-                />
-                {searchTerm && (
-                  <button 
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
-                  >
-                    清除
-                  </button>
-                )}
-              </div>
+              </nav>
             </div>
+          </header>
 
-            {/* Phrases Grid */}
-            {filteredPhrases.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-                <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 font-medium">沒有符合搜尋關鍵字的短句</p>
-                <p className="text-xs text-slate-400 mt-1">請嘗試修改搜尋詞彙或點擊全部分類</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredPhrases.map((item) => {
-                  const isBookmarked = bookmarkedIds.includes(item.id);
-                  const isMastered = masteredIds.includes(item.id);
-
-                  return (
-                    <div 
-                      key={item.id} 
-                      className={`bg-white p-5 rounded-2xl shadow-sm border transition flex flex-col justify-between hover:shadow-md ${
-                        isMastered ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-200'
-                      }`}
-                    >
-                      <div>
-                        {/* Header Controls */}
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
-                            {CATEGORIES.find(c => c.id === item.category)?.name.split(' ')[0] || 'OT 臨床'}
-                          </span>
-                          <div className="flex items-center space-x-1">
-                            <button
-                              onClick={() => toggleMastered(item.id)}
-                              title={isMastered ? "標記為未掌握" : "標記為已掌握"}
-                              className={`p-1.5 rounded-lg transition ${
-                                isMastered ? 'text-emerald-600 bg-emerald-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
-                              }`}
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => toggleBookmark(item.id)}
-                              title={isBookmarked ? "移除收藏" : "加入收藏"}
-                              className={`p-1.5 rounded-lg transition ${
-                                isBookmarked ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
-                              }`}
-                            >
-                              <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-amber-400' : ''}`} />
-                            </button>
-                            <button
-                              onClick={() => speakText(item.audioText)}
-                              className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition"
-                              title="播放朗讀"
-                            >
-                              <Volume2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* English Phrase */}
-                        <p className="text-slate-900 font-semibold text-base leading-relaxed mb-2 font-serif">
-                          {item.english}
-                        </p>
-
-                        {/* Chinese Translation */}
-                        <p className="text-slate-600 text-sm mb-4 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                          {item.chinese}
-                        </p>
-
-                        {/* Tags */}
-                        <div className="flex flex-wrap gap-1.5 mb-3">
-                          {item.keywords.map((kw, idx) => (
-                            <span key={idx} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-medium">
-                              #{kw}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Clinical Usage Context */}
-                      <div className="mt-2 pt-3 border-t border-slate-100 flex items-start space-x-2 text-xs text-slate-500">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                        <span><strong>臨床應用提示：</strong>{item.context}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- MODULE 2: INTERACTIVE CASE STUDIES --- */}
-        {activeTab === 'reading' && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Case List Sidebar */}
-            <div className="lg:col-span-1 space-y-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">臨床案例文章庫</h3>
-              {ARTICLES.map(art => {
-                const isSelected = art.id === currentArticleId;
-                return (
+          {/* TTS Bar */}
+          <div className="bg-slate-100 border-b border-slate-200 py-1.5 px-4 text-xs text-slate-600 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Volume2 className="w-4 h-4 text-teal-600" />
+                <span className="font-semibold">語音速度 (TTS Rate):</span>
+                {[0.8, 0.9, 1.0, 1.2].map(rate => (
                   <button
-                    key={art.id}
-                    onClick={() => {
-                      setCurrentArticleId(art.id);
-                      setQuizAnswers({});
-                      setQuizSubmitted(false);
-                    }}
-                    className={`w-full text-left p-4 rounded-2xl border transition flex flex-col justify-between ${
-                      isSelected 
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-md' 
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-teal-400 hover:shadow-sm'
+                    key={rate}
+                    onClick={() => setSpeechRate(rate)}
+                    className={`px-2 py-0.5 rounded font-mono text-[11px] ${
+                      speechRate === rate ? 'bg-teal-600 text-white font-bold' : 'bg-white border border-slate-300'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className={`font-semibold px-2 py-0.5 rounded ${isSelected ? 'bg-teal-900 text-teal-200' : 'bg-slate-100 text-slate-600'}`}>
-                          {art.difficulty}
-                        </span>
-                        <span className={isSelected ? 'text-slate-300' : 'text-slate-400'}>{art.readTime}</span>
-                      </div>
-                      <h4 className="font-bold text-sm leading-snug line-clamp-2 mt-1">{art.title}</h4>
-                    </div>
-                    <p className={`text-xs mt-2 line-clamp-1 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>{art.subtitle}</p>
+                    {rate}x
                   </button>
-                );
-              })}
+                ))}
+              </div>
+              <div className="text-[11px] text-slate-500">
+                掌握進度: <strong className="text-emerald-600">{masteredIds.length}</strong> / {PHRASES.length}
+              </div>
             </div>
+          </div>
 
-            {/* Main Reading View */}
-            <div className="lg:col-span-3 space-y-6">
-              <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200/80">
-                {/* Article Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200 gap-4">
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">{currentArticle.title}</h2>
-                    <p className="text-sm text-slate-500 mt-1">{currentArticle.subtitle}</p>
+          {/* Main View */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">
+            
+            {/* MODULE 1: CLINICAL PHRASES */}
+            {activeTab === 'phrases' && (
+              <div className="space-y-6">
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
+                    {CATEGORIES.map(cat => {
+                      const CatIcon = cat.Icon;
+                      const isSelected = selectedCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => setSelectedCategory(cat.id)}
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm whitespace-nowrap transition ${
+                            isSelected ? 'bg-teal-700 text-white font-medium' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <CatIcon className="w-3.5 h-3.5" />
+                          <span>{cat.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    <button
-                      onClick={() => setShowChineseArticle(!showChineseArticle)}
-                      className="px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200"
-                    >
-                      {showChineseArticle ? "隱藏中譯" : "顯示雙語"}
-                    </button>
-                    <button
-                      onClick={() => speakText(currentArticle.paragraphs.map(p => p.en).join(' '))}
-                      className="px-3 py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-xl hover:bg-teal-700 transition flex items-center space-x-1 shadow-sm"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>全文朗讀</span>
-                    </button>
+
+                  <div className="relative w-full md:w-72">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="搜尋短句或中文..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
                   </div>
                 </div>
 
-                {/* Paragraphs */}
-                <div className="py-6 space-y-6">
-                  {currentArticle.paragraphs.map((p) => (
-                    <div key={p.id} className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 hover:border-teal-200 transition space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-slate-900 font-serif text-base sm:text-lg leading-relaxed">
-                          {p.en}
-                        </p>
-                        <button
-                          onClick={() => speakText(p.en)}
-                          className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-white rounded-lg transition flex-shrink-0"
-                          title="朗讀此段"
-                        >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredPhrases.map((item) => {
+                    const isBookmarked = bookmarkedIds.includes(item.id);
+                    const isMastered = masteredIds.includes(item.id);
+                    return (
+                      <div key={item.id} className={`bg-white p-5 rounded-2xl shadow-sm border transition flex flex-col justify-between ${isMastered ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-200'}`}>
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <span className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                              {CATEGORIES.find(c => c.id === item.category)?.name || 'OT 臨床'}
+                            </span>
+                            <div className="flex items-center space-x-1">
+                              <button onClick={() => toggleMastered(item.id)} className={`p-1.5 rounded-lg ${isMastered ? 'text-emerald-600 bg-emerald-100' : 'text-slate-300 hover:bg-slate-100'}`}>
+                                <CheckCircle2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => toggleBookmark(item.id)} className={`p-1.5 rounded-lg ${isBookmarked ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:bg-slate-100'}`}>
+                                <Bookmark className="w-4 h-4" fill={isBookmarked} />
+                              </button>
+                              <button onClick={() => speakText(item.english)} className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">
+                                <Volume2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <p className="text-slate-900 font-semibold text-base leading-relaxed mb-2 font-serif">{item.english}</p>
+                          <p className="text-slate-600 text-sm mb-4 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">{item.chinese}</p>
+                        </div>
+
+                        <div className="mt-2 pt-3 border-t border-slate-100 flex items-start space-x-2 text-xs text-slate-500">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <span><strong>臨床提示：</strong>{item.context}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* MODULE 2: CASE READINGS */}
+            {activeTab === 'reading' && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">{ARTICLES[0].title}</h2>
+                    <p className="text-sm text-slate-500">{ARTICLES[0].subtitle}</p>
+                  </div>
+                  <button onClick={() => setShowChineseArticle(!showChineseArticle)} className="px-3 py-1.5 bg-slate-100 text-xs font-semibold rounded-xl border">
+                    {showChineseArticle ? "隱藏中譯" : "顯示雙語"}
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {ARTICLES[0].paragraphs.map((p) => (
+                    <div key={p.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <p className="text-slate-900 font-serif text-base leading-relaxed">{p.en}</p>
+                        <button onClick={() => speakText(p.en)} className="text-slate-400 hover:text-teal-600 p-1">
                           <Volume2 className="w-4 h-4" />
                         </button>
                       </div>
-
-                      {/* Interactive Vocab Tags */}
-                      {p.vocab && p.vocab.length > 0 && (
+                      {p.vocab && (
                         <div className="flex flex-wrap gap-2 pt-1">
-                          <span className="text-[11px] font-bold text-slate-400 self-center">點擊單字查卡:</span>
                           {p.vocab.map((v, vIdx) => (
-                            <button
-                              key={vIdx}
-                              onClick={() => setActiveVocabModal(v)}
-                              className="text-xs bg-teal-50 border border-teal-200 text-teal-800 px-2 py-0.5 rounded-md hover:bg-teal-100 font-medium transition"
-                            >
+                            <button key={vIdx} onClick={() => setActiveVocabModal(v)} className="text-xs bg-teal-50 border border-teal-200 text-teal-800 px-2 py-0.5 rounded font-medium">
                               {v.word}
                             </button>
                           ))}
                         </div>
                       )}
-
-                      {/* Chinese Translation */}
-                      {showChineseArticle && (
-                        <p className="text-slate-600 text-sm leading-relaxed pt-2 border-t border-slate-200/60">
-                          {p.zh}
-                        </p>
-                      )}
+                      {showChineseArticle && <p className="text-slate-600 text-sm pt-2 border-t border-slate-200/60">{p.zh}</p>}
                     </div>
                   ))}
                 </div>
-
-                {/* Comprehension Quiz */}
-                <div className="mt-8 pt-8 border-t-2 border-slate-100">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Award className="w-5 h-5 text-amber-500" />
-                    <h3 className="text-lg font-bold text-slate-900">案例理解與專業問答 (Clinical Comprehension Quiz)</h3>
-                  </div>
-
-                  <div className="space-y-6">
-                    {currentArticle.quiz.map((q, idx) => (
-                      <div key={q.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <p className="font-semibold text-slate-800 text-sm mb-3">
-                          {idx + 1}. {q.question}
-                        </p>
-                        <div className="space-y-2">
-                          {q.options.map((opt, optIdx) => {
-                            const isSelected = quizAnswers[q.id] === optIdx;
-                            const isCorrect = q.correct === optIdx;
-                            let btnStyle = "bg-white text-slate-700 border-slate-200 hover:border-teal-300";
-
-                            if (quizSubmitted) {
-                              if (isCorrect) {
-                                btnStyle = "bg-emerald-100 text-emerald-900 border-emerald-400 font-medium";
-                              } else if (isSelected && !isCorrect) {
-                                btnStyle = "bg-rose-100 text-rose-900 border-rose-300";
-                              }
-                            } else if (isSelected) {
-                              btnStyle = "bg-teal-50 text-teal-900 border-teal-500 font-medium";
-                            }
-
-                            return (
-                              <button
-                                key={optIdx}
-                                disabled={quizSubmitted}
-                                onClick={() => setQuizAnswers(prev => ({ ...prev, [q.id]: optIdx }))}
-                                className={`w-full text-left p-3 rounded-lg border text-xs sm:text-sm transition flex items-center justify-between ${btnStyle}`}
-                              >
-                                <span>{opt}</span>
-                                {quizSubmitted && isCorrect && <Check className="w-4 h-4 text-emerald-600" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {quizSubmitted && (
-                          <div className="mt-3 p-3 bg-amber-50/70 border border-amber-200 rounded-lg text-xs text-slate-600">
-                            <strong>💡 臨床解析 (Rationale):</strong> {q.rationale}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    <div className="flex justify-end space-x-3 pt-2">
-                      {quizSubmitted ? (
-                        <button
-                          onClick={() => {
-                            setQuizAnswers({});
-                            setQuizSubmitted(false);
-                          }}
-                          className="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-300 transition"
-                        >
-                          重新測驗
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setQuizSubmitted(true)}
-                          disabled={Object.keys(quizAnswers).length < currentArticle.quiz.length}
-                          className="px-5 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 disabled:opacity-50 transition shadow-sm"
-                        >
-                          送出答案
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* --- MODULE 3: SOAP BUILDER & SANDBOX --- */}
-        {activeTab === 'soap' && (
-          <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-gradient-to-r from-slate-900 to-teal-900 text-white p-6 rounded-2xl shadow-md">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-white/10 rounded-xl backdrop-blur">
+            {/* MODULE 3: SOAP BUILDER */}
+            {activeTab === 'soap' && (
+              <div className="max-w-4xl mx-auto space-y-6">
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md flex items-center space-x-3">
                   <FileText className="w-6 h-6 text-teal-300" />
+                  <div>
+                    <h2 className="text-lg font-bold">SOAP 病歷實戰組裝沙盒</h2>
+                    <p className="text-xs text-slate-300">選擇不同章節的標準描述，即時生成可複製的英文病歷。</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold">SOAP 病歷實戰組裝與匯出沙盒</h2>
-                  <p className="text-xs text-teal-100/80 mt-1">
-                    針對 S (主觀描述)、O (客觀數據)、A (臨床分析)、P (未來計畫) 進行選句組合，生成專業標準 OT 書寫格式。
-                  </p>
-                </div>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Option Selection Controls */}
-              <div className="space-y-4">
-                {Object.keys(SOAP_BUILDER_DATA).map((sectionKey) => {
-                  const sec = SOAP_BUILDER_DATA[sectionKey];
-                  return (
-                    <div key={sectionKey} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
-                      <h4 className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded inline-block">
-                        {sec.title}
-                      </h4>
-                      <div className="space-y-2 pt-1">
-                        {sec.options.map((opt, oIdx) => {
-                          const isSelected = soapSelections[sectionKey] === oIdx;
-                          return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    {Object.keys(SOAP_BUILDER_DATA).map((secKey) => {
+                      const sec = SOAP_BUILDER_DATA[secKey];
+                      return (
+                        <div key={secKey} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+                          <h4 className="text-xs font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded inline-block">{sec.title}</h4>
+                          {sec.options.map((opt, oIdx) => (
                             <button
                               key={oIdx}
-                              onClick={() => setSoapSelections(prev => ({ ...prev, [sectionKey]: oIdx }))}
+                              onClick={() => setSoapSelections(prev => ({ ...prev, [secKey]: oIdx }))}
                               className={`w-full text-left p-3 rounded-lg text-xs border transition ${
-                                isSelected 
-                                  ? 'bg-teal-50 text-teal-900 border-teal-500 font-medium ring-1 ring-teal-500' 
-                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                soapSelections[secKey] === oIdx ? 'bg-teal-50 text-teal-900 border-teal-500 font-medium' : 'bg-slate-50 text-slate-700'
                               }`}
                             >
                               <p className="font-mono">{opt.text}</p>
                               <p className="text-[11px] text-slate-500 mt-1">{opt.translation}</p>
                             </button>
-                          );
-                        })}
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-fit sticky top-20">
+                    <div>
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                        <h3 className="font-bold text-slate-900 text-sm">預覽與匯出病歷文字</h3>
+                        <button onClick={() => copyToClipboard(builtSoapText)} className="flex items-center space-x-1 px-3 py-1 bg-teal-600 text-white text-xs font-bold rounded-lg">
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{copiedSoap ? "已複製！" : "複製全文"}</span>
+                        </button>
+                      </div>
+                      <div className="mt-4 p-4 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl whitespace-pre-wrap leading-relaxed">
+                        {builtSoapText}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Generated Result Preview */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-fit sticky top-20">
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                    <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                      <Sparkle className="w-4 h-4 text-teal-600" />
-                      <span>預覽與匯出病歷文字</span>
-                    </h3>
-                    <button
-                      onClick={() => copyToClipboard(builtSoapText)}
-                      className="flex items-center space-x-1 px-3 py-1 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 transition"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{copiedSoap ? "已複製！" : "複製全文"}</span>
-                    </button>
-                  </div>
-
-                  <div className="mt-4 p-4 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl whitespace-pre-wrap leading-relaxed shadow-inner">
-                    {builtSoapText}
                   </div>
                 </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
-                  💡 <strong>提示：</strong>可在臨床時直接複製此段結構化英文，視個案數據微調分數或數值後貼入 EHR 電子病歷系統。
-                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* --- MODULE 4: OT GLOSSARY & ABBREVIATIONS --- */}
-        {activeTab === 'glossary' && (
-          <div className="space-y-6">
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="relative w-full">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="搜尋 OT 縮寫 (ADL, OTPF, MAS, MMT) 或中文定義..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {GLOSSARY.filter(g => 
-                g.term.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                g.fullText.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                g.definition.includes(searchTerm)
-              ).map((item, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:border-teal-300 transition">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg font-extrabold text-teal-800 tracking-wide font-mono">{item.term}</span>
-                      <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">
-                        {item.category}
-                      </span>
+            {/* MODULE 4: GLOSSARY */}
+            {activeTab === 'glossary' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {GLOSSARY.map((item, idx) => (
+                    <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-lg font-extrabold text-teal-800 font-mono">{item.term}</span>
+                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full">{item.category}</span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 mb-2">{item.fullText}</p>
+                        <p className="text-sm text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">{item.definition}</p>
+                      </div>
                     </div>
-                    <p className="text-xs font-semibold text-slate-700 mb-2">{item.fullText}</p>
-                    <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      {item.definition}
-                    </p>
-                  </div>
-                  <div className="mt-3 text-right">
-                    <button
-                      onClick={() => speakText(`${item.term}, ${item.fullText}`)}
-                      className="text-xs text-teal-600 hover:text-teal-800 font-semibold inline-flex items-center space-x-1"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>發音導讀</span>
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* --- MODULE 5: FLASHCARD REVIEW MODE --- */}
-        {activeTab === 'flashcards' && (
-          <div className="max-w-xl mx-auto space-y-6">
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-slate-900">OT 翻牌複習模式 (Flashcard Trainer)</h2>
-              <p className="text-xs text-slate-500 mt-1">點擊卡牌即可翻面查看臨床中文翻譯與重點解析</p>
-            </div>
-
-            {/* Flashcard Container */}
-            <div 
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="bg-white min-h-[260px] p-8 rounded-3xl border-2 border-teal-200 shadow-lg cursor-pointer flex flex-col items-center justify-center text-center transition-all duration-300 hover:border-teal-400 relative"
-            >
-              <span className="absolute top-4 right-4 text-xs font-mono text-slate-400">
-                {cardIndex + 1} / {PHRASES.length}
-              </span>
-
-              {!isFlipped ? (
-                <div className="space-y-3">
-                  <span className="text-xs font-bold bg-teal-50 text-teal-700 px-3 py-1 rounded-full border border-teal-100">
-                    ENGLISH
-                  </span>
-                  <p className="text-lg font-serif font-semibold text-slate-900 leading-relaxed">
-                    {PHRASES[cardIndex].english}
-                  </p>
-                  <p className="text-xs text-slate-400 pt-2">👆 點擊卡片翻看中文釋義</p>
+            {/* MODULE 5: FLASHCARDS */}
+            {activeTab === 'flashcards' && (
+              <div className="max-w-xl mx-auto space-y-6">
+                <div 
+                  onClick={() => setIsFlipped(!isFlipped)}
+                  className="bg-white min-h-[240px] p-8 rounded-3xl border-2 border-teal-200 shadow-lg cursor-pointer flex flex-col items-center justify-center text-center transition"
+                >
+                  {!isFlipped ? (
+                    <div className="space-y-3">
+                      <span className="text-xs font-bold bg-teal-50 text-teal-700 px-3 py-1 rounded-full">ENGLISH</span>
+                      <p className="text-lg font-serif font-semibold text-slate-900">{PHRASES[cardIndex].english}</p>
+                      <p className="text-xs text-slate-400">👆 點擊卡片翻面</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <span className="text-xs font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full">CHINESE</span>
+                      <p className="text-base font-medium text-slate-800">{PHRASES[cardIndex].chinese}</p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <span className="text-xs font-bold bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-100">
-                    CHINESE TRANSLATION
-                  </span>
-                  <p className="text-base font-medium text-slate-800 leading-relaxed">
-                    {PHRASES[cardIndex].chinese}
-                  </p>
-                  <p className="text-xs text-slate-500 italic bg-slate-50 p-2 rounded-lg">
-                    💡 {PHRASES[cardIndex].context}
-                  </p>
+                <div className="flex items-center justify-between">
+                  <button onClick={() => { setIsFlipped(false); setCardIndex(prev => (prev > 0 ? prev - 1 : PHRASES.length - 1)); }} className="px-4 py-2 bg-slate-200 text-xs font-bold rounded-xl">上一張</button>
+                  <button onClick={() => speakText(PHRASES[cardIndex].english)} className="p-3 bg-teal-600 text-white rounded-full"><Volume2 className="w-5 h-5" /></button>
+                  <button onClick={() => { setIsFlipped(false); setCardIndex(prev => (prev < PHRASES.length - 1 ? prev + 1 : 0)); }} className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl">下一張</button>
                 </div>
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setIsFlipped(false);
-                  setCardIndex(prev => (prev > 0 ? prev - 1 : PHRASES.length - 1));
-                }}
-                className="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-300 transition"
-              >
-                上一張 (Prev)
-              </button>
-
-              <button
-                onClick={() => speakText(PHRASES[cardIndex].audioText)}
-                className="p-3 bg-teal-600 text-white rounded-full hover:bg-teal-700 shadow"
-                title="播放聲音"
-              >
-                <Volume2 className="w-5 h-5" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsFlipped(false);
-                  setCardIndex(prev => (prev < PHRASES.length - 1 ? prev + 1 : 0));
-                }}
-                className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition"
-              >
-                下一張 (Next)
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* --- MODULE 6: BOOKMARKS & PROGRESS DASHBOARD --- */}
-        {activeTab === 'bookmarks' && (
-          <div className="space-y-6 max-w-5xl mx-auto">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-              <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-100">
-                <p className="text-xs text-slate-500 font-semibold mb-1">已掌握短句句型</p>
-                <p className="text-2xl font-extrabold text-emerald-700">{masteredIds.length} <span className="text-xs font-normal text-slate-400">/ {PHRASES.length}</span></p>
               </div>
-              <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-100">
-                <p className="text-xs text-slate-500 font-semibold mb-1">已收藏句型與案例</p>
-                <p className="text-2xl font-extrabold text-amber-600">{bookmarkedIds.length}</p>
-              </div>
-              <div className="p-4 bg-teal-50/60 rounded-xl border border-teal-100">
-                <p className="text-xs text-slate-500 font-semibold mb-1">整體學習達成率</p>
-                <p className="text-2xl font-extrabold text-teal-700">
-                  {Math.round((masteredIds.length / PHRASES.length) * 100)}%
-                </p>
-              </div>
-            </div>
+            )}
 
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Bookmark className="w-4 h-4 text-amber-500 fill-amber-500" />
-              <span>我的收藏清單 (Bookmarked Items)</span>
-            </h3>
-
-            {bookmarkedIds.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
-                <Bookmark className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="text-slate-500 font-medium text-sm">目前尚無收藏項目</p>
-                <p className="text-xs text-slate-400 mt-1">在短句卡牌點擊書籤圖示即可加入收藏</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
+            {/* MODULE 6: BOOKMARKS */}
+            {activeTab === 'bookmarks' && (
+              <div className="space-y-4 max-w-4xl mx-auto">
+                <h3 className="text-base font-bold text-slate-900">我的收藏清單</h3>
                 {PHRASES.filter(p => bookmarkedIds.includes(p.id)).map(item => (
-                  <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+                  <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-200 flex items-start justify-between gap-4">
                     <div>
                       <p className="font-semibold text-slate-900 text-sm mb-1">{item.english}</p>
                       <p className="text-slate-600 text-xs">{item.chinese}</p>
                     </div>
-                    <button
-                      onClick={() => toggleBookmark(item.id)}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-medium flex-shrink-0"
-                    >
-                      移除收藏
-                    </button>
+                    <button onClick={() => toggleBookmark(item.id)} className="text-xs text-rose-500 font-medium">移除</button>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-        )}
-      </main>
+          </main>
 
-      {/* Interactive Vocab Popup Modal */}
-      {activeVocabModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-slate-200 space-y-4 animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between border-b pb-3 border-slate-100">
-              <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">OT 專業詞彙卡</span>
-              <button 
-                onClick={() => setActiveVocabModal(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold p-1"
-              >
-                ✕
-              </button>
+          {/* Vocab Modal */}
+          {activeVocabModal && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4">
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-xs font-bold text-teal-600">OT 單字卡</span>
+                  <button onClick={() => setActiveVocabModal(null)} className="text-slate-400 font-bold">✕</button>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold font-mono">{activeVocabModal.word}</h3>
+                  <p className="text-xs text-slate-400">{activeVocabModal.phonetic}</p>
+                </div>
+                <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">{activeVocabModal.definition}</p>
+                <div className="flex justify-end">
+                  <button onClick={() => speakText(activeVocabModal.word)} className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl flex items-center space-x-1">
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>發音</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-extrabold text-slate-900 font-mono">{activeVocabModal.word}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">{activeVocabModal.phonetic}</p>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <p className="text-sm font-medium text-slate-700">{activeVocabModal.definition}</p>
-            </div>
-            <div className="flex justify-end space-x-2 pt-2">
-              <button
-                onClick={() => speakText(activeVocabModal.word)}
-                className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition flex items-center space-x-1"
-              >
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>發音朗讀</span>
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      );
+    }
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-6 mt-12">
-        <div className="max-w-7xl mx-auto px-4 text-center text-xs space-y-1">
-          <p className="font-semibold text-slate-300">OT Medical English Hub • 職能治療專業英文學習網</p>
-          <p className="text-slate-500">Tailored for Occupational Therapy Practitioners, Academicians & Students</p>
-        </div>
-      </footer>
-    </div>
-  );
-}
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
